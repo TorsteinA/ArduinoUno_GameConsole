@@ -31,7 +31,7 @@ RTC_DS1307 rtc;
 
 DateTime now, previousTime;
 
-int state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = high Scores, 4 = gameOverMenu (some go to not-implemented screen);
+int state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = high Scores, 4 = showGameOverMenu (some go to not-implemented screen);
 int previousState;
 const int STATE_MAIN_MENU = 0;
 const int STATE_GAME_ONE = 1;
@@ -88,7 +88,7 @@ void setup(void) {
   }
   previousTime = now;
 
-  runStartUpAnimation(ST7735_BLACK, ST7735_YELLOW);
+  runStartUpAnimation(ST7735_BLACK, ST7735_GREEN);
   tft.fillScreen(ST7735_BLACK);
 
   showMainMenu();
@@ -121,8 +121,11 @@ void loop() {
     } else if (state == STATE_GAME_ONE) {
       tft.fillScreen(backgroundColor);
       startGameOne();
+    } else if (state == STATE_GAME_TWO) {
+      tft.fillScreen(backgroundColor);
+      startGameTwo();
     } else if (state == STATE_GAME_OVER) {
-      gameOverMenu();
+      showGameOverMenu();
     } else {
       tft.fillScreen(backgroundColor);
       showNotImplemented();
@@ -135,10 +138,10 @@ void loop() {
     mainMenu();
     
   } else if (state == STATE_GAME_ONE) {
-    if (!paused){
-      playGameOne();
-    } else {
+    if (paused){
       pauseMenu();
+    } else {
+      playGameOne();
     }
     
   } else if (state == STATE_GAME_TWO) {
@@ -147,10 +150,9 @@ void loop() {
   } else if (state == STATE_HIGH_SCORES) {
     // High Scores
 
-  } else if (state == STATE_GAME_OVER) {
-    // Game Over Menu
-
-  }
+  }/* else if (state == STATE_GAME_OVER) {
+    
+  }*/
   delay(50);
 }
 
@@ -210,6 +212,94 @@ void updateMenuSelection() {
   if (menuSelection >= numberOfMenuSelections) menuSelection = numberOfMenuSelections - 1;
 }
 
+void showMainMenu() {
+  tft.setTextSize(2);
+  showText(10, 20, "Main Menu", ST7735_GREEN);
+  tft.setTextSize(1);
+
+  showText(20, 65, "Don't get hit", ST7735_CYAN);
+  showText(20, 85, "Through the slit", ST7735_CYAN);
+  showText(20, 105, "High Scores", ST7735_CYAN);
+}
+
+void showMainMenuSelection() {
+  int y = 65 + (20 * menuSelection);
+
+  showText(5, y, ">", ST7735_WHITE);
+}
+
+void hideMainMenuSelections() {
+  for (int i = 0; i <= numberOfMenuSelections; i++) {
+    int y = 65 + (20 * i);
+    hideText(5, y, 6);
+  }
+}
+
+// --- Pause Menu stuff --- //
+
+
+void pauseMenu(){
+  updatePauseMenuSelection();
+  hidePauseMenuSelections();
+  showPauseMenuSelection();
+  delay(100);
+}
+
+void updatePauseMenuSelection(){
+  if (sensorValueX >= 900) pauseMenuSelection++;
+  else if (sensorValueX <= 100) pauseMenuSelection--;
+  if (pauseMenuSelection < 0) pauseMenuSelection = 0;
+  if (pauseMenuSelection >= numberOfPauseMenuSelections) pauseMenuSelection = numberOfPauseMenuSelections - 1;
+}
+
+void hidePauseMenuSelections(){
+  for (int i = 0; i <= numberOfPauseMenuSelections; i++) {
+    int y = 70 + (20 * i);
+    hideText(5, y, 6);
+  }
+}
+
+void showPauseMenuSelection(){
+  int y = 70 + (20 * pauseMenuSelection);
+
+  showText(5, y, ">", ST7735_WHITE);
+}
+
+void showPauseMenu() {
+  tft.drawRoundRect(9, 17, 111, 27, 5, ST7735_RED);
+  tft.setTextSize(3);
+  showText(12, 20, "Paused", ST7735_RED);
+  tft.setTextSize(1);
+  showText(20, 70, "Resume", ST7735_CYAN);
+  showText(20, 90, "Back to Menu", ST7735_CYAN);
+}
+
+void hidePauseMenu(){
+  hideText(15, 40, 6 * 6);
+}
+
+
+// --- Game Over Menu stuff --- //
+
+
+void showGameOverMenu() {
+  hideTextLine(0);
+  tft.drawRoundRect(26, 11, 76, 54, 5, ST7735_RED);
+  tft.setTextSize(3);
+  showText(30, 15, "Game", ST7735_RED);
+  showText(30, 40, "Over", ST7735_RED);
+  tft.setTextSize(1);
+  String s = "Score: ";
+  s += scoreTimer;
+
+  showText(35, 75, s, ST7735_GREEN);
+  
+  showText(5, 110, ">", ST7735_WHITE);
+  showText(25, 110, "Back to Menu", ST7735_CYAN);
+
+}
+
+
 // --- Game One Stuff --- //
 
 void startGameOne() {
@@ -220,6 +310,8 @@ void startGameOne() {
   paused = false;
   if (gos) {
     gos->resetStone(random(tft.width() - gos->size ), stoneStartSpeed, stoneStartSize);
+  } else {
+    gos = spawnStone(stoneStartSpeed, stoneStartSize);
   }
 }
 
@@ -256,9 +348,6 @@ bool CrashedWithPlayer(gameOneStone* _gos) {
 }
 
 void updateGameOneStone(){
-  if (!gos) {
-    gos = spawnStone(stoneStartSpeed, stoneStartSize);
-  }
   gos->moveStep();
 
   if (gos->y >= gos->maxFallLength) {
@@ -303,77 +392,40 @@ void showUpdateStones() {
   tft.fillRect(gos->x, gos->y, gos->size, gos->size, ST7735_RED);
 }
 
-void gameOverMenu() {
-  hideTextLine(0);
-  showText(30, 40, "Game Over", ST7735_RED);
-  String s = "Score: ";
-  s += scoreTimer;
-  showText(30, 80, s, ST7735_GREEN);
-  showText(0, 120, "To Menu: Press button", ST7735_BLUE);
-
-}
-
-void pauseMenu(){
-  updatePauseMenuSelection();
-  hidePauseMenuSelections();
-  showPauseMenuSelection();
-  delay(100);
-}
-
-void updatePauseMenuSelection(){
-  if (sensorValueX >= 900) pauseMenuSelection++;
-  else if (sensorValueX <= 100) pauseMenuSelection--;
-  if (pauseMenuSelection < 0) pauseMenuSelection = 0;
-  if (pauseMenuSelection >= numberOfPauseMenuSelections) pauseMenuSelection = numberOfPauseMenuSelections - 1;
-}
-
-void hidePauseMenuSelections(){
-  for (int i = 0; i <= numberOfPauseMenuSelections; i++) {
-    int y = 70 + (20 * i);
-    hideText(5, y, 6);
-  }
-}
-
-void showPauseMenuSelection(){
-  int y = 70 + (20 * pauseMenuSelection);
-
-  showText(5, y, ">", ST7735_WHITE);
-}
-
-
-
-// --- Show stuff --- //
-
-void showPauseMenu() {
-  showText(15, 20, "Paused", ST7735_RED);
-  showText(20, 70, "Resume", ST7735_CYAN);
-  showText(20, 90, "Back to Menu", ST7735_CYAN);
-}
-
-void showMainMenu() {
-  showText(15, 20, "Choose your Game", ST7735_BLUE);
-  showText(20, 50, "Don't get hit", ST7735_CYAN);
-  showText(20, 70, "Through the slit", ST7735_CYAN);
-  showText(20, 90, "High Scores", ST7735_WHITE);
-}
-
-void showMainMenuSelection() {
-  int y = 50 + (20 * menuSelection);
-
-  showText(5, y, ">", ST7735_WHITE);
-}
-
-void showNotImplemented() {
-  showText(15, 40, "Not Implemented", ST7735_RED);
-  showText(0, 80, "To Menu: Press button", ST7735_BLUE);
-}
-
 void showScoreTimer() {
   String s = "Score: ";
   s += scoreTimer;
   showTextLine(0, s, ST7735_YELLOW);
 }
 
+
+// --- Game Two stuff --- //
+
+void startGameTwo(){
+  showGameTwoStartupAnimation();
+  playerX = tft.height() / 2 - 5;
+  playerY = 30;
+  scoreTimer = 0;
+  paused = false;
+
+  // if wall, resetWall
+  // else, spawnWall
+
+
+  //Remove later:
+  tft.fillScreen(backgroundColor);
+  showNotImplemented();
+
+}
+
+
+// --- Show other stuff --- //
+
+
+void showNotImplemented() {
+  showText(15, 40, "Not Implemented", ST7735_RED);
+  showText(0, 80, "To Menu: Press button", ST7735_BLUE);
+}
 
 void showTextLine(int yValue, String text, uint16_t color) {
   showText(0, yValue, text, color);
@@ -388,16 +440,6 @@ void showText(int xValue, int yValue, String text, uint16_t color) {
 
 // --- Hide stuff --- //
 
-void hidePauseMenu(){
-  hideText(15, 40, 6 * 6);
-}
-
-void hideMainMenuSelections() {
-  for (int i = 0; i <= numberOfMenuSelections; i++) {
-    int y = 50 + (20 * i);
-    hideText(5, y, 6);
-  }
-}
 
 
 void hideText(int xStart, int yStart, int width) {
@@ -414,13 +456,36 @@ void hideTextLine(int yValue) {
 
 void runStartUpAnimation(uint16_t color1, uint16_t color2) {
   tft.fillScreen(backgroundColor);
-  for (int16_t x = tft.width() - 1; x > 6; x -= 6) {
-    tft.fillRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2 , x, x, color1);
-    tft.drawRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2 , x, x, color2);
+
+  int color = 100;
+  int i;
+  int t;
+  for(t = 0 ; t <= 4; t+=1) {
+    int x = 0;
+    int y = 0;
+    int w = tft.width()-2;
+    int h = tft.height()-2;
+    for(i = 0 ; i <= 16; i+=1) {
+      tft.drawRoundRect(x, y, w, h, 5, color);
+      x+=2;
+      y+=3;
+      w-=4;
+      h-=6;
+      color+=1100;
+    }
+    color+=100;
   }
-  //Show name of system (The Adventures of O) on top
-  //Delay
-  delay(500);
+  delay(100);
+  tft.setTextSize(4);
+  showText(30, 17, "The", ST7735_GREEN);
+  tft.setTextSize(2);
+  showText(5, 58, "Adventures", ST7735_GREEN);
+  tft.setTextSize(3);
+  showText(48, 80, "of", ST7735_GREEN);
+  tft.setTextSize(5);
+  showText(50, 110, "O", ST7735_GREEN);
+  tft.setTextSize(1);
+  delay(2000);
 }
 
 void showGameOneStartupAnimation() {
@@ -428,8 +493,37 @@ void showGameOneStartupAnimation() {
     tft.fillRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2 , x, x, ST7735_BLACK);
     tft.drawRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2 , x, x, ST7735_BLUE);
   }
-  // Show title of game on top
-  // Delay
-  delay(400);
+  delay(100);
+  tft.setTextSize(4);
+  showText(7, 23, "Don't", ST7735_RED);
+  showText(30, 63, "Get", ST7735_RED);
+  showText(30, 103, "Hit", ST7735_RED);
+  tft.setTextSize(1);
+  delay(1500);
+  tft.fillScreen(backgroundColor);
+}
+
+void showGameTwoStartupAnimation(){
+  int color = 0xF800;
+  int t;
+  int w = tft.width()/2;
+  int x = tft.height()-1;
+  int y = 0;
+  int z = tft.width();
+  for(t = 0 ; t <= 15; t++) {
+    tft.drawTriangle(w, y, y, x, z, x, color);
+    x-=4;
+    y+=4;
+    z-=4;
+    color+=100;
+  }
+  delay(100);
+  tft.setTextSize(2);
+  showText(23, 35, "Through", ST7735_GREEN);
+  tft.setTextSize(3);
+  showText(38, 67, "The", ST7735_GREEN);
+  showText(30, 105, "Slit", ST7735_GREEN);
+  tft.setTextSize(1);
+  delay(1500);
   tft.fillScreen(backgroundColor);
 }
