@@ -8,6 +8,7 @@ gameOneStone::gameOneStone(int _x, int _speed, int _size, int _maxFallLength){
     previousY = y;
     maxFallLength = _maxFallLength;
     maxSpeed = 15;
+    maxSize = 20;
 }
 
 void gameOneStone::moveStep(){
@@ -18,12 +19,14 @@ void gameOneStone::moveStep(){
 void gameOneStone::backToTop(int _newPos){
     y = 10;
     if (++speed >= maxSpeed) speed = maxSpeed;
+    if (speed == maxSpeed && ++size >= maxSize) size = maxSize;
     x = _newPos;
 }
 
-void gameOneStone::resetStone(int _newPos, int _speed){
+void gameOneStone::resetStone(int _newPos, int _speed, int _size){
     y = 10;
     speed = _speed;
+    size = _size;
     x = _newPos;
 }
 

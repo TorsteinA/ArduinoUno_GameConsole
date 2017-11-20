@@ -31,23 +31,31 @@ RTC_DS1307 rtc;
 
 DateTime now, previousTime;
 
-int state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = game3 (2 and 3 goes to not-implemented);
+int state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = high Scores, 4 = gameOverMenu (some go to not-implemented screen);
 int previousState;
+const int STATE_MAIN_MENU = 0;
+const int STATE_GAME_ONE = 1;
+const int STATE_GAME_TWO = 2;
+const int STATE_HIGH_SCORES = 3;
+const int STATE_GAME_OVER = 4;
+
 
 // Main Menu
 int menuSelection = 0;
 int numberOfMenuSelections = 3;
 
 // Game One
-int playerX, previousPlayerX, playerY, previousPlayerY;
 const int maxSpeed = 10;
-int scoreTimer = 0;
 int stoneStartSpeed = 2;
-int numberOfStones = 0;
-
+int stoneStartSize = 4;
 gameOneStone* gos = NULL;
 
-
+// Games
+int playerX, previousPlayerX, playerY, previousPlayerY;
+int scoreTimer = 0;
+bool paused = false;
+int pauseMenuSelection = 0;
+int numberOfPauseMenuSelections = 2;
 
 void setup(void) {
 
@@ -65,7 +73,7 @@ void setup(void) {
   tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
   tft.setRotation(2); // Flips the output upside down. This is due to how I placed the hardware
 
-  
+
   if (! rtc.begin()) {
     Serial.println("Couldn't find RTC");
     while (1);
@@ -82,9 +90,9 @@ void setup(void) {
 
   runStartUpAnimation(ST7735_BLACK, ST7735_YELLOW);
   tft.fillScreen(ST7735_BLACK);
-  
+
   showMainMenu();
-  
+
   Serial.println("Initialized");
 }
 
@@ -94,7 +102,7 @@ void loop() {
   sensorValueY = analogRead(analogInPinY);
   sensorValueX = analogRead(analogInPinX);
 
-  // Check input
+  // Check button input
   if (buttonState != lastButtonState) {
     if (buttonState == LOW) {
       pressedJoystickButton();
@@ -105,203 +113,262 @@ void loop() {
     lastButtonState = buttonState;
   }
 
-  // Update state
-  if (state != previousState){
-    tft.fillScreen(ST7735_BLACK);
-    if (state == 0){
+  // Check State Update
+  if (state != previousState) {
+    if (state == STATE_MAIN_MENU) {
+      tft.fillScreen(backgroundColor);
       showMainMenu();
-    } else if (state == 1){
+    } else if (state == STATE_GAME_ONE) {
+      tft.fillScreen(backgroundColor);
       startGameOne();
+    } else if (state == STATE_GAME_OVER) {
+      gameOverMenu();
     } else {
+      tft.fillScreen(backgroundColor);
       showNotImplemented();
     }
     previousState = state;
   }
 
   // Display
-  if (state == 0){
-    // Main Menu
+  if (state == STATE_MAIN_MENU) {
     mainMenu();
-
-  } else if (state == 1){
-    // Game One
     
-
-    // Logic
-    previousPlayerX = playerX;
-    previousPlayerY = playerY;
-
-    playerX += map(sensorValueX, 30, 1000, -maxSpeed, maxSpeed);
-    if (sensorValueX > 450 && sensorValueX < 550) playerX = previousPlayerX;
-    if (playerX < 10) playerX = 10; // 10 pixels reserved for score 
-    else if (playerX >= tft.height() - 10) playerX = tft.height() - 10;
-
-    playerY += map(sensorValueY, 30, 1000, maxSpeed, -maxSpeed);
-    if (sensorValueY > 450 && sensorValueY < 550) playerY = previousPlayerY;
-    if (playerY < 0) playerY = 0;
-    else if (playerY >= tft.width() - 6) playerY = tft.width() - 6;
-    
-    updateScoreTimer();
-
-    
-    if (scoreTimer % 2 == 0 && !gos){
-      gos = spawnStone(stoneStartSpeed, 5);    //  Stone logic needs work
-
-      // Needs better spawning condition
-      // Spawns at random width, at top.
-      // After having spawned, it falls towards the bottom in a straight line
-      // When it reaches bottom, it despawns
-      // Rate increases over time.
-      
-
+  } else if (state == STATE_GAME_ONE) {
+    if (!paused){
+      playGameOne();
+    } else {
+      pauseMenu();
     }
-
-
-    if (gos){
-      gos->moveStep();
-
-      if (gos->y >= gos->maxFallLength){
-        tft.fillRect(gos->x, gos->previousY, 10, 5, backgroundColor);
-        hideTextLine(tft.height()-10);
-        gos->backToTop(random(tft.width() - gos->size ));
-      } 
-      showStones();
-
-      //If crash with player
-      if (CrashedWithPlayer(gos)) gameOver();
-
-
-    }
-
-
-
-
-
-
-    // output
-
-    showScoreTimer();
-
-
-
-
-    hideText(previousPlayerY, previousPlayerX, 6);
-    showText(playerY, playerX, "o", ST7735_WHITE);
-
     
-
-
-    
-  } else if (state == 2){
+  } else if (state == STATE_GAME_TWO) {
     // Game Two
 
-  } else if (state == 3){
-    // Game Three
+  } else if (state == STATE_HIGH_SCORES) {
+    // High Scores
+
+  } else if (state == STATE_GAME_OVER) {
+    // Game Over Menu
 
   }
   delay(50);
 }
 
 
-void pressedJoystickButton(){
-  if (state == 0){  // in main menu
-    state = menuSelection +1; // +1 to offset from mainMenu state
-  } else{
-    state = 0;  //reset to menu state;
+void pressedJoystickButton() {
+  if (state == STATE_MAIN_MENU) { // in main menu
+    state = menuSelection + 1; // +1 to offset from mainMenu state
+  } else if (state == STATE_GAME_ONE) { // in game one
+    if (paused && pauseMenuSelection == 0) {
+      // Resume Game by:
+        // Hide pause stuff or clear screen
+        // Paused = false;
+
+      tft.fillScreen(backgroundColor);
+      paused = false;
+      
+    } else if (paused && pauseMenuSelection == 1){
+      // Exit to Menu and save score by:
+        // hide pause stuff or clear screen
+        // paused = false
+        // save score
+        // state = game over
+
+      tft.fillScreen(backgroundColor);
+      paused = false;
+      // Save Score
+      state = STATE_MAIN_MENU;
+      
+    } else if (!paused) {
+      paused = true;
+      showPauseMenu();
+    }
+
+  } else {
+    state = STATE_MAIN_MENU;  //reset to menu state;
   }
 }
 
-void releasedJoystickButton(){
-  hideTextLine(0);
+void releasedJoystickButton() {
+  //hideTextLine(0);
 }
 
 
 // --- Main Menu Stuff --- //
 
-void mainMenu(){
+void mainMenu() {
   updateMenuSelection();
   hideMainMenuSelections();
-  showMainMenuSelection(); 
+  showMainMenuSelection();
   delay(100);
 }
 
-void updateMenuSelection(){
+void updateMenuSelection() {
   if (sensorValueX >= 900) menuSelection++;
   else if (sensorValueX <= 100) menuSelection--;
   if (menuSelection < 0) menuSelection = 0;
-  if (menuSelection >= numberOfMenuSelections) menuSelection = numberOfMenuSelections-1;
+  if (menuSelection >= numberOfMenuSelections) menuSelection = numberOfMenuSelections - 1;
 }
 
 // --- Game One Stuff --- //
 
-void startGameOne(){
+void startGameOne() {
   showGameOneStartupAnimation();
-  playerX = tft.height()/2 - 5;
-  playerY = tft.width()/2 - 3;
+  playerX = tft.height() / 2 - 5;
+  playerY = tft.width() / 2 - 3;
   scoreTimer = 0;
+  paused = false;
   if (gos) {
-    gos->resetStone(random(tft.width() - gos->size ), stoneStartSpeed);
+    gos->resetStone(random(tft.width() - gos->size ), stoneStartSpeed, stoneStartSize);
   }
 }
 
-gameOneStone* spawnStone(int speed, int size){
-  gameOneStone* gs = new gameOneStone(random(tft.width() - size), speed, size, tft.height());
-  return gs;
+void playGameOne() {
+  // Input
+  updatePlayerInput();
+
+  // Logic
+  updateScoreTimer();
+  updateGameOneStone();
+  
+  if (CrashedWithPlayer(gos)) {
+    state = STATE_GAME_OVER;
+    //Save Score to file
+  }
+
+  // Output
+  showUpdateStones();
+  showScoreTimer();
+  showUpdatePlayerPos();
 }
 
-bool CrashedWithPlayer(gameOneStone* _gos){
-  if (_gos->x + 9 < playerY) return false;
+gameOneStone* spawnStone(int speed, int size) {
+  return new gameOneStone(random(tft.width() - size), speed, size, tft.height());
+}
+
+bool CrashedWithPlayer(gameOneStone* _gos) {
+  if (_gos->x + /*9*/ _gos->size - 1 < playerY) return false;
   if (_gos->x > playerY + 5) return false;
-  if (_gos->y + 9 < playerX) return false;
+  if (_gos->y + /*9*/ _gos->size - 1 < playerX) return false;
   if (_gos->y > playerX + 5) return false;
 
   return true;
 }
 
-void updateScoreTimer(){
-  if (previousTime.second() != now.second()){
-    hideText(8*5, 0, 6*5);
+void updateGameOneStone(){
+  if (!gos) {
+    gos = spawnStone(stoneStartSpeed, stoneStartSize);
+  }
+  gos->moveStep();
+
+  if (gos->y >= gos->maxFallLength) {
+    tft.fillRect(gos->x, gos->previousY, gos->size, gos->size, backgroundColor);
+    hideTextLine(tft.height() - 10);
+    gos->backToTop(random(tft.width() - gos->size ));
+  }
+
+}
+
+void updateScoreTimer() {
+  if (previousTime.second() != now.second()) {
+    hideText(8 * 5, 0, 6 * 5);
     previousTime = now;
     scoreTimer++;
   }
 }
 
-void showStones(){
-  tft.fillRect(gos->x, gos->previousY, 10, 10, backgroundColor);
-  tft.fillRect(gos->x, gos->y, 10, 10, ST7735_RED);
+void updatePlayerInput() {
+  previousPlayerX = playerX;
+  previousPlayerY = playerY;
+
+  playerX += map(sensorValueX, 30, 1000, -maxSpeed, maxSpeed);
+  if (sensorValueX > 450 && sensorValueX < 550) playerX = previousPlayerX;
+  if (playerX < 10) playerX = 10; // 10 pixels reserved for score
+  else if (playerX >= tft.height() - 10) playerX = tft.height() - 10;
+
+  playerY += map(sensorValueY, 30, 1000, maxSpeed, -maxSpeed);
+  if (sensorValueY > 450 && sensorValueY < 550) playerY = previousPlayerY;
+  if (playerY < 0) playerY = 0;
+  else if (playerY >= tft.width() - 6) playerY = tft.width() - 6;
+
 }
 
-void gameOver(){
-  showText(20, 90, "Game Over", ST7735_RED);
-  //Stop movement
-  //Stop stone(s)
-  //Show score
+void showUpdatePlayerPos(){
+  hideText(previousPlayerY, previousPlayerX, 6);
+  showText(playerY, playerX, "o", ST7735_WHITE);
+}
+
+void showUpdateStones() {
+  tft.fillRect(gos->x, gos->previousY, gos->size, gos->size, backgroundColor);
+  tft.fillRect(gos->x, gos->y, gos->size, gos->size, ST7735_RED);
+}
+
+void gameOverMenu() {
+  hideTextLine(0);
+  showText(30, 40, "Game Over", ST7735_RED);
+  String s = "Score: ";
+  s += scoreTimer;
+  showText(30, 80, s, ST7735_GREEN);
+  showText(0, 120, "To Menu: Press button", ST7735_BLUE);
 
 }
 
-
-// --- Show stuff --- //
-
-void showMainMenu(){
-  showText(15, 20, "Choose your Game", ST7735_BLUE);
-  showText(20, 50, "First Game", ST7735_CYAN);
-  showText(20, 70, "Second Game", ST7735_CYAN);
-  showText(20, 90, "High Scores", ST7735_CYAN);
+void pauseMenu(){
+  updatePauseMenuSelection();
+  hidePauseMenuSelections();
+  showPauseMenuSelection();
+  delay(100);
 }
 
-void showMainMenuSelection(){
-  int y = 50 + (20*menuSelection);
+void updatePauseMenuSelection(){
+  if (sensorValueX >= 900) pauseMenuSelection++;
+  else if (sensorValueX <= 100) pauseMenuSelection--;
+  if (pauseMenuSelection < 0) pauseMenuSelection = 0;
+  if (pauseMenuSelection >= numberOfPauseMenuSelections) pauseMenuSelection = numberOfPauseMenuSelections - 1;
+}
+
+void hidePauseMenuSelections(){
+  for (int i = 0; i <= numberOfPauseMenuSelections; i++) {
+    int y = 70 + (20 * i);
+    hideText(5, y, 6);
+  }
+}
+
+void showPauseMenuSelection(){
+  int y = 70 + (20 * pauseMenuSelection);
 
   showText(5, y, ">", ST7735_WHITE);
 }
 
-void showNotImplemented(){
+
+
+// --- Show stuff --- //
+
+void showPauseMenu() {
+  showText(15, 20, "Paused", ST7735_RED);
+  showText(20, 70, "Resume", ST7735_CYAN);
+  showText(20, 90, "Back to Menu", ST7735_CYAN);
+}
+
+void showMainMenu() {
+  showText(15, 20, "Choose your Game", ST7735_BLUE);
+  showText(20, 50, "Don't get hit", ST7735_CYAN);
+  showText(20, 70, "Through the slit", ST7735_CYAN);
+  showText(20, 90, "High Scores", ST7735_WHITE);
+}
+
+void showMainMenuSelection() {
+  int y = 50 + (20 * menuSelection);
+
+  showText(5, y, ">", ST7735_WHITE);
+}
+
+void showNotImplemented() {
   showText(15, 40, "Not Implemented", ST7735_RED);
   showText(0, 80, "To Menu: Press button", ST7735_BLUE);
 }
 
-void showScoreTimer(){
-  //hideTextLine(0);  //Optimize to hide only relevant square
+void showScoreTimer() {
   String s = "Score: ";
   s += scoreTimer;
   showTextLine(0, s, ST7735_YELLOW);
@@ -318,14 +385,20 @@ void showText(int xValue, int yValue, String text, uint16_t color) {
   tft.println(text);
 }
 
+
 // --- Hide stuff --- //
 
-void hideMainMenuSelections(){
-  for (int i = 0; i <= numberOfMenuSelections; i++){
+void hidePauseMenu(){
+  hideText(15, 40, 6 * 6);
+}
+
+void hideMainMenuSelections() {
+  for (int i = 0; i <= numberOfMenuSelections; i++) {
     int y = 50 + (20 * i);
     hideText(5, y, 6);
   }
 }
+
 
 void hideText(int xStart, int yStart, int width) {
   tft.fillRect(xStart, yStart, width, 10 /*default font size*/, backgroundColor);
@@ -336,21 +409,27 @@ void hideTextLine(int yValue) {
   //tft.fillRect(0, yValue, tft.width(), 10 /*default font size*/, backgroundColor);
 }
 
+
 // --- Animations --- //
 
 void runStartUpAnimation(uint16_t color1, uint16_t color2) {
-  //tft.fillScreen(ST7735_BLACK);
-  for (int16_t x=tft.width()-1; x > 6; x-=6) {
-    tft.fillRect(tft.width()/2 -x/2, tft.height()/2 -x/2 , x, x, color1);
-    tft.drawRect(tft.width()/2 -x/2, tft.height()/2 -x/2 , x, x, color2);
+  tft.fillScreen(backgroundColor);
+  for (int16_t x = tft.width() - 1; x > 6; x -= 6) {
+    tft.fillRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2 , x, x, color1);
+    tft.drawRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2 , x, x, color2);
   }
-  //Clear Screen
+  //Show name of system (The Adventures of O) on top
+  //Delay
+  delay(500);
 }
 
-void showGameOneStartupAnimation(){
-  for (int16_t x=tft.width()-1; x > 6; x-=6) {
-    tft.fillRect(tft.width()/2 -x/2, tft.height()/2 -x/2 , x, x, ST7735_BLACK);
-    tft.drawRect(tft.width()/2 -x/2, tft.height()/2 -x/2 , x, x, ST7735_BLUE);
+void showGameOneStartupAnimation() {
+  for (int16_t x = tft.width() - 1; x > 6; x -= 6) {
+    tft.fillRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2 , x, x, ST7735_BLACK);
+    tft.drawRect(tft.width() / 2 - x / 2, tft.height() / 2 - x / 2 , x, x, ST7735_BLUE);
   }
-  tft.fillScreen(ST7735_BLACK);
+  // Show title of game on top
+  // Delay
+  delay(400);
+  tft.fillScreen(backgroundColor);
 }

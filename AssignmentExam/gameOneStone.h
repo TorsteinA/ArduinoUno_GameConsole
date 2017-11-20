@@ -7,7 +7,7 @@ public:
     ~gameOneStone();
     void moveStep();
     void backToTop(int _newPos);
-    void resetStone(int _newPos, int _speed);
+    void resetStone(int _newPos, int _speed, int _size);
     int x;
     int y;
     int previousY;
@@ -15,6 +15,7 @@ public:
     int size;
     int maxFallLength;
     int maxSpeed;
+    int maxSize;
 };
 
 
