@@ -266,6 +266,7 @@ void showPauseMenuSelection(){
 }
 
 void showPauseMenu() {
+  // Square of backgroundColor behind Paused Text
   tft.drawRoundRect(9, 17, 111, 27, 5, ST7735_RED);
   tft.setTextSize(3);
   showText(12, 20, "Paused", ST7735_RED);
@@ -284,6 +285,7 @@ void hidePauseMenu(){
 
 void showGameOverMenu() {
   hideTextLine(0);
+  // Square of backgroundColor behind GameOver Text  
   tft.drawRoundRect(26, 11, 76, 54, 5, ST7735_RED);
   tft.setTextSize(3);
   showText(30, 15, "Game", ST7735_RED);
