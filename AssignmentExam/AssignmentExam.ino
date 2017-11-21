@@ -1,6 +1,7 @@
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library
 #include <SPI.h>
+#include <SD.h>
 #include <Wire.h> // Date and time functions using a DS1307 RTC connected via I2C and Wire lib
 #include "RTClib.h"
 //#include "pitches.h"
@@ -16,6 +17,7 @@ const uint8_t TFT_MOSI = 11;
 const uint8_t analogInPinY = A0;
 const uint8_t analogInPinX = A1;
 const uint8_t buttonPin = 2;
+const uint8_t chipSelect = 4;
 
 uint16_t sensorValueY = 0;
 uint16_t sensorValueX = 0;
@@ -27,8 +29,10 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
 const uint16_t backgroundColor = ST7735_BLACK;
 
 RTC_DS1307 rtc;
-
 DateTime now, previousTime;
+
+File myFile;
+
 
 uint8_t state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = high Scores, 4 = showGameOverMenu (some go to not-implemented screen);
 uint8_t previousState;
@@ -43,11 +47,14 @@ const uint8_t STATE_GAME_OVER = 4;
 uint8_t menuSelection = 0;
 uint8_t numberOfMenuSelections = 3;
 
+
 // Game One
 const uint8_t maxSpeed = 10;
 uint8_t stoneStartSpeed = 2;
 uint8_t stoneStartSize = 4;
 gameOneStone* gos = NULL;
+int highScoresOne[] = {1,2,3,4};
+
 
 // Games
 uint16_t playerX, previousPlayerX, playerY, previousPlayerY;
@@ -65,13 +72,23 @@ void setup(void) {
 
   while (!Serial); // for Leonardo/Micro/Zero
 
-  Serial.begin(57600);
+  //Serial.begin(57600);
+  Serial.begin(9600);
+
+  Serial.print("Initializing SD card...");
+  if (!SD.begin(chipSelect)) {
+    Serial.println("initialization failed!");
+    return;
+  }
+  Serial.println("initialization successfull.");
+  
 
 
   // Use this initializer if you're using a 1.8" TFT
   tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
   tft.setRotation(2); // Flips the output upside down. This is due to how I placed the hardware
 
+  //runSDSetup();
 
   if (! rtc.begin()) {
     Serial.println("Couldn't find RTC");
@@ -93,6 +110,7 @@ void setup(void) {
   showMainMenu();
 
   Serial.println("Initialized");
+  
 }
 
 void loop() {
@@ -123,6 +141,9 @@ void loop() {
     } else if (state == STATE_GAME_TWO) {
       tft.fillScreen(backgroundColor);
       startGameTwo();
+    } else if (state == STATE_HIGH_SCORES) {
+      tft.fillScreen(backgroundColor);
+      showHighScoreMenu();
     } else if (state == STATE_GAME_OVER) {
       showGameOverMenu();
     } else {
@@ -326,6 +347,7 @@ void playGameOne() {
   if (CrashedWithPlayer(gos)) {
     state = STATE_GAME_OVER;
     //Save Score to file
+    SaveGameOneScore(scoreTimer);
   }
 
   // Output
@@ -412,9 +434,13 @@ void startGameTwo(){
   // else, spawnWall
 
 
+
+
+
   //Remove later:
   tft.fillScreen(backgroundColor);
   showNotImplemented();
+  
 
 }
 
@@ -436,6 +462,22 @@ void showText(int xValue, int yValue, String text, uint16_t color) {
   tft.println(text);
 }
 
+void showHighScoreMenu(){
+
+  updateHighScores();
+
+  showText(10, 10, "Scores:", ST7735_CYAN);
+
+
+  for (int i = 0; i <= sizeof(highScoresOne)/sizeof(highScoresOne[0])-1; i++){
+    String s = "";
+    s += highScoresOne[i];
+    showText(20, 20 + (10*i), s, ST7735_BLUE);
+  }
+  
+  showText(10, 110, "Done reading.", ST7735_CYAN);
+
+}
 
 // --- Hide stuff --- //
 
@@ -523,4 +565,106 @@ void showGameTwoStartupAnimation(){
   tft.setTextSize(1);
   delay(1500);
   tft.fillScreen(backgroundColor);
+}
+
+// --- SD Card methods --- //
+
+void runSDSetup() {
+  /*
+    // Open serial communications and wait for port to open:
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
+
+
+  Serial.print("Initializing SD card...");
+
+  if (!SD.begin(chipSelect)) {
+    Serial.println("initialization failed!");
+    return;
+  }
+  Serial.println("initialization done.");
+
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  myFile = SD.open("game1.txt", FILE_WRITE);
+
+  // if the file opened okay, write to it:
+  if (myFile) {
+    Serial.print("Writing to test.txt...");
+    myFile.println("testing 1, 2, 3.");
+    // close the file:
+    myFile.close();
+    Serial.println("done.");
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening test.txt");
+  }
+
+  // re-open the file for reading:
+  myFile = SD.open("game1.txt");
+  if (myFile) {
+    Serial.println("game1.txt:");
+
+    // read from the file until there's nothing else in it:
+    while (myFile.available()) {
+      Serial.write(myFile.read());
+    }
+    // close the file:
+    myFile.close();
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening game1.txt");
+  }
+  */
+
+  delay(1000);
+}
+
+void updateHighScores(){
+  //Load all values from SD card ("game1.txt") into tempArray
+  //Sort tempArray in decreasing order
+  //Fill highScoresOne array with elements from tempArray
+}
+
+void SaveGameOneScore(uint16_t score) { 
+  myFile = SD.open("game1.txt", FILE_WRITE);
+  
+  if (myFile) {
+    Serial.print("Writing to game1.txt...");
+    
+    myFile.println(score);
+    myFile.close();
+    
+    Serial.println("closed game1.txt");
+  } else {
+    Serial.println("error opening game1.txt");
+  }
+}
+
+int LoadGameOneScore(uint8_t line){
+  int* score = -1;
+  int i = 0;
+  Serial.println("Reading from game1.txt");
+
+  myFile = SD.open("game1.txt");
+  
+  if (myFile) {
+    Serial.println("opened game1.txt");
+
+    // read from the file until there's nothing else in it:
+    while (myFile.available()) {
+    //while (i >=4) {
+      Serial.println("Reading value from game1..");
+      //Serial.write(myFile.read());
+      score[i++] = myFile.read();
+    }
+
+    myFile.close();
+    Serial.println("closed game1.txt");
+  } else {
+    Serial.println("error opening game1.txt");
+  }
+
+  return score[line];
 }
