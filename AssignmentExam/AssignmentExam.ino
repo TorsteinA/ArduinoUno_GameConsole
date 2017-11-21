@@ -8,20 +8,19 @@
 
 // For the breakout, you can use any 2 or 3 pins
 // These pins will also work for the 1.8" TFT shield
-const int TFT_CS   = 10;
-const int TFT_RST  = 8;
-const int TFT_DC   = 9;
-const int TFT_SCLK = 13;
-const int TFT_MOSI = 11;
-const int analogInPinY = A0;
-const int analogInPinX = A1;
-const int buttonPin = 2;
+const uint8_t TFT_CS   = 10;
+const uint8_t TFT_RST  = 8;
+const uint8_t TFT_DC   = 9;
+const uint8_t TFT_SCLK = 13;
+const uint8_t TFT_MOSI = 11;
+const uint8_t analogInPinY = A0;
+const uint8_t analogInPinX = A1;
+const uint8_t buttonPin = 2;
 
-int sensorValueY = 0;
-int sensorValueX = 0;
-int buttonState = 0;          // current state of the button
-int buttonState2 = 0;         // current state of the button2
-int lastButtonState = 0;      // previous state of the button
+uint16_t sensorValueY = 0;
+uint16_t sensorValueX = 0;
+uint8_t buttonState = 0;          // current state of the button
+uint8_t lastButtonState = 0;      // previous state of the button
 
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
@@ -31,31 +30,31 @@ RTC_DS1307 rtc;
 
 DateTime now, previousTime;
 
-int state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = high Scores, 4 = showGameOverMenu (some go to not-implemented screen);
-int previousState;
-const int STATE_MAIN_MENU = 0;
-const int STATE_GAME_ONE = 1;
-const int STATE_GAME_TWO = 2;
-const int STATE_HIGH_SCORES = 3;
-const int STATE_GAME_OVER = 4;
+uint8_t state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = high Scores, 4 = showGameOverMenu (some go to not-implemented screen);
+uint8_t previousState;
+const uint8_t STATE_MAIN_MENU = 0;
+const uint8_t STATE_GAME_ONE = 1;
+const uint8_t STATE_GAME_TWO = 2;
+const uint8_t STATE_HIGH_SCORES = 3;
+const uint8_t STATE_GAME_OVER = 4;
 
 
 // Main Menu
-int menuSelection = 0;
-int numberOfMenuSelections = 3;
+uint8_t menuSelection = 0;
+uint8_t numberOfMenuSelections = 3;
 
 // Game One
-const int maxSpeed = 10;
-int stoneStartSpeed = 2;
-int stoneStartSize = 4;
+const uint8_t maxSpeed = 10;
+uint8_t stoneStartSpeed = 2;
+uint8_t stoneStartSize = 4;
 gameOneStone* gos = NULL;
 
 // Games
-int playerX, previousPlayerX, playerY, previousPlayerY;
-int scoreTimer = 0;
+uint16_t playerX, previousPlayerX, playerY, previousPlayerY;
+uint16_t scoreTimer = 0;
 bool paused = false;
-int pauseMenuSelection = 0;
-int numberOfPauseMenuSelections = 2;
+uint8_t pauseMenuSelection = 0;
+uint8_t numberOfPauseMenuSelections = 2;
 
 void setup(void) {
 
@@ -223,14 +222,14 @@ void showMainMenu() {
 }
 
 void showMainMenuSelection() {
-  int y = 65 + (20 * menuSelection);
+  uint8_t y = 65 + (20 * menuSelection);
 
   showText(5, y, ">", ST7735_WHITE);
 }
 
 void hideMainMenuSelections() {
-  for (int i = 0; i <= numberOfMenuSelections; i++) {
-    int y = 65 + (20 * i);
+  for (uint8_t i = 0; i <= numberOfMenuSelections; i++) {
+    uint8_t y = 65 + (20 * i);
     hideText(5, y, 6);
   }
 }
@@ -253,14 +252,14 @@ void updatePauseMenuSelection(){
 }
 
 void hidePauseMenuSelections(){
-  for (int i = 0; i <= numberOfPauseMenuSelections; i++) {
-    int y = 70 + (20 * i);
+  for (uint8_t i = 0; i <= numberOfPauseMenuSelections; i++) {
+    uint8_t y = 70 + (20 * i);
     hideText(5, y, 6);
   }
 }
 
 void showPauseMenuSelection(){
-  int y = 70 + (20 * pauseMenuSelection);
+  uint8_t y = 70 + (20 * pauseMenuSelection);
 
   showText(5, y, ">", ST7735_WHITE);
 }
@@ -281,7 +280,6 @@ void hidePauseMenu(){
 
 
 // --- Game Over Menu stuff --- //
-
 
 void showGameOverMenu() {
   hideTextLine(0);
@@ -423,7 +421,6 @@ void startGameTwo(){
 
 // --- Show other stuff --- //
 
-
 void showNotImplemented() {
   showText(15, 40, "Not Implemented", ST7735_RED);
   showText(0, 80, "To Menu: Press button", ST7735_BLUE);
@@ -442,8 +439,6 @@ void showText(int xValue, int yValue, String text, uint16_t color) {
 
 // --- Hide stuff --- //
 
-
-
 void hideText(int xStart, int yStart, int width) {
   tft.fillRect(xStart, yStart, width, 10 /*default font size*/, backgroundColor);
 }
@@ -459,14 +454,14 @@ void hideTextLine(int yValue) {
 void runStartUpAnimation(uint16_t color1, uint16_t color2) {
   tft.fillScreen(backgroundColor);
 
-  int color = 100;
-  int i;
-  int t;
+  uint8_t color = 100;
+  uint8_t i;
+  uint8_t t;
   for(t = 0 ; t <= 4; t+=1) {
-    int x = 0;
-    int y = 0;
-    int w = tft.width()-2;
-    int h = tft.height()-2;
+    uint8_t x = 0;
+    uint8_t y = 0;
+    uint8_t w = tft.width()-2;
+    uint8_t h = tft.height()-2;
     for(i = 0 ; i <= 16; i+=1) {
       tft.drawRoundRect(x, y, w, h, 5, color);
       x+=2;
@@ -506,12 +501,12 @@ void showGameOneStartupAnimation() {
 }
 
 void showGameTwoStartupAnimation(){
-  int color = 0xF800;
-  int t;
-  int w = tft.width()/2;
-  int x = tft.height()-1;
-  int y = 0;
-  int z = tft.width();
+  uint8_t color = 0xF800;
+  uint8_t t;
+  uint8_t w = tft.width()/2;
+  uint8_t x = tft.height()-1;
+  uint8_t y = 0;
+  uint8_t z = tft.width();
   for(t = 0 ; t <= 15; t++) {
     tft.drawTriangle(w, y, y, x, z, x, color);
     x-=4;
