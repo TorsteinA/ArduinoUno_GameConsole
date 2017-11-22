@@ -53,7 +53,7 @@ const uint8_t maxSpeed = 10;
 uint8_t stoneStartSpeed = 2;
 uint8_t stoneStartSize = 4;
 gameOneStone* gos = NULL;
-int highScoresOne[] = {1,2,3,4};
+int highScoresOne[] = {5,6,7,8};
 
 
 // Games
@@ -62,6 +62,7 @@ uint16_t scoreTimer = 0;
 bool paused = false;
 uint8_t pauseMenuSelection = 0;
 uint8_t numberOfPauseMenuSelections = 2;
+const uint8_t tempLoadArraySize = 8;
 
 void setup(void) {
 
@@ -569,62 +570,33 @@ void showGameTwoStartupAnimation(){
 
 // --- SD Card methods --- //
 
-void runSDSetup() {
-  /*
-    // Open serial communications and wait for port to open:
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
-
-
-  Serial.print("Initializing SD card...");
-
-  if (!SD.begin(chipSelect)) {
-    Serial.println("initialization failed!");
-    return;
-  }
-  Serial.println("initialization done.");
-
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
-  myFile = SD.open("game1.txt", FILE_WRITE);
-
-  // if the file opened okay, write to it:
-  if (myFile) {
-    Serial.print("Writing to test.txt...");
-    myFile.println("testing 1, 2, 3.");
-    // close the file:
-    myFile.close();
-    Serial.println("done.");
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
-  }
-
-  // re-open the file for reading:
-  myFile = SD.open("game1.txt");
-  if (myFile) {
-    Serial.println("game1.txt:");
-
-    // read from the file until there's nothing else in it:
-    while (myFile.available()) {
-      Serial.write(myFile.read());
-    }
-    // close the file:
-    myFile.close();
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening game1.txt");
-  }
-  */
-
-  delay(1000);
-}
-
 void updateHighScores(){
   //Load all values from SD card ("game1.txt") into tempArray
   //Sort tempArray in decreasing order
   //Fill highScoresOne array with elements from tempArray
+  //Clear file ("game1.txt")
+  //Save top scores in order
+
+
+  
+  
+  int* score;//[tempLoadArraySize];
+
+  Serial.print("Score created.");
+  Serial.println(score[0]);
+  
+  LoadGameOneScore(&score);
+
+  Serial.print("Score returned. Now: ");
+  Serial.println(score[0]);
+  
+  
+  // Sort temp Array
+
+  
+  for(byte i = 0; i <= sizeof(highScoresOne)/sizeof(highScoresOne[0]); i++){
+    highScoresOne[i] = score[i];
+  }
 }
 
 void SaveGameOneScore(uint16_t score) { 
@@ -642,8 +614,8 @@ void SaveGameOneScore(uint16_t score) {
   }
 }
 
-int LoadGameOneScore(uint8_t line){
-  int* score = -1;
+void LoadGameOneScore(int **score){
+//  int score[tempLoadArraySize];
   int i = 0;
   Serial.println("Reading from game1.txt");
 
@@ -653,11 +625,18 @@ int LoadGameOneScore(uint8_t line){
     Serial.println("opened game1.txt");
 
     // read from the file until there's nothing else in it:
-    while (myFile.available()) {
-    //while (i >=4) {
-      Serial.println("Reading value from game1..");
+    //while (myFile.available() && i <= sizeof(highScoresOne)/sizeof(highScoresOne[0] -1) ) {
+    //while (i <= 4) {
+    //while (i <= sizeof(highScoresOne)/sizeof(highScoresOne[0]) && myFile.available())
+    while (i <= tempLoadArraySize && myFile.available())
+    {
+      Serial.print("Reading value from game1..");
+      int k = myFile.read();
+      Serial.print(k);
       //Serial.write(myFile.read());
-      score[i++] = myFile.read();
+      *score[i] = k;//myFile.read();   // Set back to k
+      //highScoresOne[i] = k;
+      i++;
     }
 
     myFile.close();
@@ -665,6 +644,5 @@ int LoadGameOneScore(uint8_t line){
   } else {
     Serial.println("error opening game1.txt");
   }
-
-  return score[line];
+  //return score;
 }
