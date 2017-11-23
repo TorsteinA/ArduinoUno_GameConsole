@@ -34,6 +34,7 @@ DateTime now, previousTime;
 File myFile;
 
 
+
 uint8_t state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = high Scores, 4 = showGameOverMenu (some go to not-implemented screen);
 uint8_t previousState;
 const uint8_t STATE_MAIN_MENU = 0;
@@ -47,13 +48,60 @@ const uint8_t STATE_GAME_OVER = 4;
 uint8_t menuSelection = 0;
 uint8_t numberOfMenuSelections = 3;
 
+const char mainMenuTitle[] PROGMEM = "Main Menu";
+const char mainMenuGameOne[] PROGMEM = "Don't get hit";
+const char mainMenuGameTwo[] PROGMEM = "Through the slit";
+const char mainMenuScores[] PROGMEM = "High Scores";
+const char pauseTitle[] PROGMEM = "Paused";
+const char pauseResume[] PROGMEM = "Resume";
+const char pauseBack[] PROGMEM = "Back to Menu";  //also for gameOver screen
+const char gameOverGame[] PROGMEM = "GAME";
+const char gameOverOver[] PROGMEM = "OVER";
+const char gameOverScore[] PROGMEM = "Score: ";
+const char highScore[] PROGMEM = "Scores:";
+const char highFileOne[] PROGMEM = "game1.txt";
+const char animDont[] PROGMEM = "Don't";
+const char animGet[] PROGMEM = "Get";
+const char animHit[] PROGMEM = "Hit";
+const char animThrough[] PROGMEM = "Through";
+const char animThe[] PROGMEM = "The";
+const char animSlit[] PROGMEM = "Slit";
+const char implemNot[] PROGMEM = "Not Implemented";
+const char implemBack[] PROGMEM = "To Menu: Press button";
+
+const char* const string_table[] PROGMEM = {
+  mainMenuTitle, 
+  mainMenuGameOne, 
+  mainMenuGameTwo, 
+  mainMenuScores, 
+  pauseTitle, 
+  pauseResume, 
+  pauseBack,
+  gameOverGame,
+  gameOverOver,
+  gameOverScore,
+  highScore,
+  highFileOne,
+  animDont,
+  animGet,
+  animHit,
+  animThrough,
+  animThe,
+  animSlit,
+  implemNot,
+  implemBack,
+};
+
+char buffer[24];    // make sure this is large enough for the largest string it must hold
+
+
 
 // Game One
 const uint8_t maxSpeed = 10;
 uint8_t stoneStartSpeed = 2;
 uint8_t stoneStartSize = 4;
 gameOneStone* gos = NULL;
-int highScoresOne[] = {5,6,7,8};
+uint16_t highScoresOne[] = {5,6,7,8};
 
 
 // Games
@@ -75,21 +123,22 @@ void setup(void) {
 
   //Serial.begin(57600);
   Serial.begin(9600);
-
-  Serial.print("Initializing SD card...");
-  if (!SD.begin(chipSelect)) {
-    Serial.println("initialization failed!");
-    return;
-  }
-  Serial.println("initialization successfull.");
   
-
-
+  
   // Use this initializer if you're using a 1.8" TFT
   tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
   tft.setRotation(2); // Flips the output upside down. This is due to how I placed the hardware
+  
+  //Serial.print("Initializing SD card...");
+  if (!SD.begin(chipSelect)) {
+    Serial.println("initialization of SD card failed!");
+    //showText(25, 40, "SD init failed", ST7735_RED);
+    //showText(25, 50, "Please restart", ST7735_RED);
 
-  //runSDSetup();
+    return;
+  }
+  Serial.println("initialization of CD card successfull.");
+    
 
   if (! rtc.begin()) {
     Serial.println("Couldn't find RTC");
@@ -109,8 +158,6 @@ void setup(void) {
   tft.fillScreen(ST7735_BLACK);
 
   showMainMenu();
-
-  Serial.println("Initialized");
   
 }
 
@@ -124,8 +171,6 @@ void loop() {
   if (buttonState != lastButtonState) {
     if (buttonState == LOW) {
       pressedJoystickButton();
-    } else {
-      releasedJoystickButton();
     }
     delay(100);
     lastButtonState = buttonState;
@@ -157,65 +202,38 @@ void loop() {
   // Display
   if (state == STATE_MAIN_MENU) {
     mainMenu();
-    
   } else if (state == STATE_GAME_ONE) {
     if (paused){
       pauseMenu();
     } else {
       playGameOne();
     }
-    
-  } else if (state == STATE_GAME_TWO) {
+  }/* else if (state == STATE_GAME_TWO) {
     // Game Two
-
-  } else if (state == STATE_HIGH_SCORES) {
-    // High Scores
-
-  }/* else if (state == STATE_GAME_OVER) {
-    
   }*/
   delay(50);
 }
 
 
 void pressedJoystickButton() {
-  if (state == STATE_MAIN_MENU) { // in main menu
+  if (state == STATE_MAIN_MENU) { 
     state = menuSelection + 1; // +1 to offset from mainMenu state
-  } else if (state == STATE_GAME_ONE) { // in game one
-    if (paused && pauseMenuSelection == 0) {
-      // Resume Game by:
-        // Hide pause stuff or clear screen
-        // Paused = false;
-
+  } else if (state == STATE_GAME_ONE) {
+    if (paused){
       tft.fillScreen(backgroundColor);
       paused = false;
-      
-    } else if (paused && pauseMenuSelection == 1){
-      // Exit to Menu and save score by:
-        // hide pause stuff or clear screen
-        // paused = false
-        // save score
-        // state = game over
-
-      tft.fillScreen(backgroundColor);
-      paused = false;
-      // Save Score
-      state = STATE_MAIN_MENU;
-      
-    } else if (!paused) {
+      if (pauseMenuSelection == 1){
+        SaveGameOneScore(scoreTimer);
+        state = STATE_MAIN_MENU;
+      }
+    } else{
       paused = true;
       showPauseMenu();
     }
-
   } else {
-    state = STATE_MAIN_MENU;  //reset to menu state;
+    state = STATE_MAIN_MENU;
   }
 }
-
-void releasedJoystickButton() {
-  //hideTextLine(0);
-}
-
 
 // --- Main Menu Stuff --- //
 
@@ -230,17 +248,23 @@ void updateMenuSelection() {
   if (sensorValueX >= 900) menuSelection++;
   else if (sensorValueX <= 100) menuSelection--;
   if (menuSelection < 0) menuSelection = 0;
-  if (menuSelection >= numberOfMenuSelections) menuSelection = numberOfMenuSelections - 1;
+  if (menuSelection >= numberOfMenuSelections) {
+    menuSelection = numberOfMenuSelections - 1;
+  }
 }
 
 void showMainMenu() {
   tft.setTextSize(2);
-  showText(10, 20, "Main Menu", ST7735_GREEN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[0]))); //main menu
+  showText(10, 20, buffer, ST7735_GREEN);
   tft.setTextSize(1);
 
-  showText(20, 65, "Don't get hit", ST7735_CYAN);
-  showText(20, 85, "Through the slit", ST7735_CYAN);
-  showText(20, 105, "High Scores", ST7735_CYAN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[1]))); //don't get hit
+  showText(20, 65, buffer, ST7735_CYAN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[2]))); //through the slit
+  showText(20, 85, buffer, ST7735_CYAN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[3]))); //high scores
+  showText(20, 105, buffer, ST7735_CYAN);
 }
 
 void showMainMenuSelection() {
@@ -290,10 +314,13 @@ void showPauseMenu() {
   // Square of backgroundColor behind Paused Text
   tft.drawRoundRect(9, 17, 111, 27, 5, ST7735_RED);
   tft.setTextSize(3);
-  showText(12, 20, "Paused", ST7735_RED);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[4]))); //paused
+  showText(12, 20, buffer, ST7735_RED);
   tft.setTextSize(1);
-  showText(20, 70, "Resume", ST7735_CYAN);
-  showText(20, 90, "Back to Menu", ST7735_CYAN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[5]))); //resume
+  showText(20, 70, buffer, ST7735_CYAN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[6]))); //back to menu
+  showText(20, 90, buffer, ST7735_CYAN);
 }
 
 void hidePauseMenu(){
@@ -308,16 +335,18 @@ void showGameOverMenu() {
   // Square of backgroundColor behind GameOver Text  
   tft.drawRoundRect(26, 11, 76, 54, 5, ST7735_RED);
   tft.setTextSize(3);
-  showText(30, 15, "Game", ST7735_RED);
-  showText(30, 40, "Over", ST7735_RED);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[7]))); //game
+  showText(30, 15, buffer, ST7735_RED);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[8]))); //over
+  showText(30, 40, buffer, ST7735_RED);
   tft.setTextSize(1);
-  String s = "Score: ";
-  s += scoreTimer;
-
-  showText(35, 75, s, ST7735_GREEN);
   
-  showText(5, 110, ">", ST7735_WHITE);
-  showText(25, 110, "Back to Menu", ST7735_CYAN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[9]))); //score:
+  sprintf(buffer, "%s%d", buffer, scoreTimer);
+  showText(35, 75, buffer, ST7735_GREEN);
+  
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[6]))); //back to menu
+  showText(27, 110, buffer, ST7735_CYAN);
 
 }
 
@@ -344,7 +373,6 @@ void playGameOne() {
   // Logic
   updateScoreTimer();
   updateGameOneStone();
-  
   if (CrashedWithPlayer(gos)) {
     state = STATE_GAME_OVER;
     //Save Score to file
@@ -362,9 +390,9 @@ gameOneStone* spawnStone(int speed, int size) {
 }
 
 bool CrashedWithPlayer(gameOneStone* _gos) {
-  if (_gos->x + /*9*/ _gos->size - 1 < playerY) return false;
+  if (_gos->x + _gos->size - 1 < playerY) return false;
   if (_gos->x > playerY + 5) return false;
-  if (_gos->y + /*9*/ _gos->size - 1 < playerX) return false;
+  if (_gos->y + _gos->size - 1 < playerX) return false;
   if (_gos->y > playerX + 5) return false;
 
   return true;
@@ -389,7 +417,7 @@ void updateScoreTimer() {
   }
 }
 
-void updatePlayerInput() {
+void updatePlayerInput() {  //Problem might be because int is unsigned
   previousPlayerX = playerX;
   previousPlayerY = playerY;
 
@@ -400,7 +428,7 @@ void updatePlayerInput() {
 
   playerY += map(sensorValueY, 30, 1000, maxSpeed, -maxSpeed);
   if (sensorValueY > 450 && sensorValueY < 550) playerY = previousPlayerY;
-  if (playerY < 0) playerY = 0;
+  if (playerY <= 1) playerY = 50;
   else if (playerY >= tft.width() - 6) playerY = tft.width() - 6;
 
 }
@@ -416,9 +444,14 @@ void showUpdateStones() {
 }
 
 void showScoreTimer() {
-  String s = "Score: ";
-  s += scoreTimer;
-  showTextLine(0, s, ST7735_YELLOW);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[9]))); //score:
+  
+  //char s[] = {buffer, scoreTimer};
+  
+  sprintf(buffer, "%s%d", buffer, scoreTimer);
+
+  //s += scoreTimer;
+  showTextLine(0, buffer, ST7735_YELLOW);
 }
 
 
@@ -435,9 +468,6 @@ void startGameTwo(){
   // else, spawnWall
 
 
-
-
-
   //Remove later:
   tft.fillScreen(backgroundColor);
   showNotImplemented();
@@ -449,15 +479,17 @@ void startGameTwo(){
 // --- Show other stuff --- //
 
 void showNotImplemented() {
-  showText(15, 40, "Not Implemented", ST7735_RED);
-  showText(0, 80, "To Menu: Press button", ST7735_BLUE);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[18])));  //not implemented
+  showText(15, 40, buffer, ST7735_RED);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[19])));  //to menu
+  showText(0, 80, buffer, ST7735_BLUE);
 }
 
-void showTextLine(int yValue, String text, uint16_t color) {
+void showTextLine(int yValue, char text[], uint16_t color) {
   showText(0, yValue, text, color);
 }
 
-void showText(int xValue, int yValue, String text, uint16_t color) {
+void showText(int xValue, int yValue, char text[], uint16_t color) {
   tft.setCursor(xValue, yValue);
   tft.setTextColor(color);
   tft.println(text);
@@ -465,19 +497,21 @@ void showText(int xValue, int yValue, String text, uint16_t color) {
 
 void showHighScoreMenu(){
 
-  updateHighScores();
+  //updateHighScores();
 
-  showText(10, 10, "Scores:", ST7735_CYAN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[10])));
+  showText(10, 10, buffer, ST7735_CYAN);
 
 
   for (int i = 0; i <= sizeof(highScoresOne)/sizeof(highScoresOne[0])-1; i++){
-    String s = "";
-    s += highScoresOne[i];
-    showText(20, 20 + (10*i), s, ST7735_BLUE);
-  }
-  
-  showText(10, 110, "Done reading.", ST7735_CYAN);
+    //char s[] = {highScoresOne[i]};
+    //s += highScoresOne[i];
 
+    sprintf(buffer, "%d", highScoresOne[i]);
+    
+
+    showText(20, 20 + (10*i), buffer, ST7735_BLUE);
+  }
 }
 
 // --- Hide stuff --- //
@@ -535,9 +569,12 @@ void showGameOneStartupAnimation() {
   }
   delay(100);
   tft.setTextSize(4);
-  showText(7, 23, "Don't", ST7735_RED);
-  showText(30, 63, "Get", ST7735_RED);
-  showText(30, 103, "Hit", ST7735_RED);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[12])));  //dont
+  showText(7, 23, buffer, ST7735_RED);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[13])));  //get
+  showText(30, 63, buffer, ST7735_RED);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[14])));  //hit
+  showText(30, 103, buffer, ST7735_RED);
   tft.setTextSize(1);
   delay(1500);
   tft.fillScreen(backgroundColor);
@@ -545,12 +582,11 @@ void showGameOneStartupAnimation() {
 
 void showGameTwoStartupAnimation(){
   uint8_t color = 0xF800;
-  uint8_t t;
   uint8_t w = tft.width()/2;
   uint8_t x = tft.height()-1;
   uint8_t y = 0;
   uint8_t z = tft.width();
-  for(t = 0 ; t <= 15; t++) {
+  for(uint8_t t = 0 ; t <= 15; t++) {
     tft.drawTriangle(w, y, y, x, z, x, color);
     x-=4;
     y+=4;
@@ -559,10 +595,13 @@ void showGameTwoStartupAnimation(){
   }
   delay(100);
   tft.setTextSize(2);
-  showText(23, 35, "Through", ST7735_GREEN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[15])));  //through
+  showText(23, 35, buffer, ST7735_GREEN);
   tft.setTextSize(3);
-  showText(38, 67, "The", ST7735_GREEN);
-  showText(30, 105, "Slit", ST7735_GREEN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[16])));  //the
+  showText(38, 67, buffer, ST7735_GREEN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[17])));  //slit
+  showText(30, 105, buffer, ST7735_GREEN);
   tft.setTextSize(1);
   delay(1500);
   tft.fillScreen(backgroundColor);
@@ -570,6 +609,7 @@ void showGameTwoStartupAnimation(){
 
 // --- SD Card methods --- //
 
+/*
 void updateHighScores(){
   //Load all values from SD card ("game1.txt") into tempArray
   //Sort tempArray in decreasing order
@@ -598,27 +638,30 @@ void updateHighScores(){
     highScoresOne[i] = score[i];
   }
 }
-
+*/
 void SaveGameOneScore(uint16_t score) { 
-  myFile = SD.open("game1.txt", FILE_WRITE);
+  
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[11])));  //fileName
+  myFile = SD.open(buffer, FILE_WRITE);
   
   if (myFile) {
-    Serial.print("Writing to game1.txt...");
+    Serial.print("Writing Opened");
     
     myFile.println(score);
     myFile.close();
     
-    Serial.println("closed game1.txt");
+    Serial.println("closed");
   } else {
-    Serial.println("error opening game1.txt");
+    Serial.println("error writing");
   }
 }
-
+/*
 void LoadGameOneScore(int **score){
 //  int score[tempLoadArraySize];
   int i = 0;
   Serial.println("Reading from game1.txt");
 
+  //myFile = SD.open("game1.txt");
   myFile = SD.open("game1.txt");
   
   if (myFile) {
@@ -632,7 +675,7 @@ void LoadGameOneScore(int **score){
     {
       Serial.print("Reading value from game1..");
       int k = myFile.read();
-      Serial.print(k);
+      Serial.println(k);
       //Serial.write(myFile.read());
       *score[i] = k;//myFile.read();   // Set back to k
       //highScoresOne[i] = k;
@@ -642,7 +685,8 @@ void LoadGameOneScore(int **score){
     myFile.close();
     Serial.println("closed game1.txt");
   } else {
-    Serial.println("error opening game1.txt");
+    Serial.println("error opening game1.txt for reading");
   }
   //return score;
 }
+*/

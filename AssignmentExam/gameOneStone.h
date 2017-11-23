@@ -3,19 +3,19 @@
 
 class gameOneStone{
 public:
-    gameOneStone(int _x, int _speed, int _size, int _max);
-    ~gameOneStone();
-    void moveStep();
-    void backToTop(int _newPos);
-    void resetStone(int _newPos, int _speed, int _size);
-    int x;
-    int y;
-    int previousY;
-    int speed;
-    int size;
-    int maxFallLength;
-    int maxSpeed;
-    int maxSize;
+  gameOneStone(unsigned short _x, unsigned short _speed, unsigned short _size, unsigned short _maxFallLength);
+  ~gameOneStone();
+  void moveStep();
+  void backToTop(unsigned short _newPos);
+  void resetStone(unsigned short _newPos, unsigned short _speed, unsigned short _size);
+  unsigned short x;
+  unsigned short y;
+  unsigned short previousY;
+  unsigned short speed;
+  unsigned short size;
+  unsigned short maxFallLength;
+  unsigned short maxSpeed;
+  unsigned short maxSize;
 };
 
 
