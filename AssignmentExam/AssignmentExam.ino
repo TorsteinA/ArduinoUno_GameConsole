@@ -4,8 +4,8 @@
 #include <SD.h>
 #include <Wire.h> // Date and time functions using a DS1307 RTC connected via I2C and Wire lib
 #include "RTClib.h"
-//#include "pitches.h"
 #include "gameOneStone.h"
+#include "gameTwoPipe.h"
 
 // For the breakout, you can use any 2 or 3 pins
 // These pins will also work for the 1.8" TFT shield
@@ -24,7 +24,6 @@ uint16_t sensorValueX = 0;
 uint8_t buttonState = 0;          // current state of the button
 uint8_t lastButtonState = 0;      // previous state of the button
 
-
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
 const uint16_t backgroundColor = ST7735_BLACK;
 
@@ -34,19 +33,13 @@ DateTime now, previousTime;
 File myFile;
 
 
-
-uint8_t state = 0;  // 0 = main Menu, 1 = game1, 2 = game2, 3 = high Scores, 4 = showGameOverMenu (some go to not-implemented screen);
+uint8_t state = 0;
 uint8_t previousState;
 const uint8_t STATE_MAIN_MENU = 0;
 const uint8_t STATE_GAME_ONE = 1;
 const uint8_t STATE_GAME_TWO = 2;
 const uint8_t STATE_HIGH_SCORES = 3;
 const uint8_t STATE_GAME_OVER = 4;
-
-
-// Main Menu
-uint8_t menuSelection = 0;
-uint8_t numberOfMenuSelections = 3;
 
 const char mainMenuTitle[] PROGMEM = "Main Menu";
 const char mainMenuGameOne[] PROGMEM = "Don't get hit";
@@ -68,6 +61,7 @@ const char animThe[] PROGMEM = "The";
 const char animSlit[] PROGMEM = "Slit";
 const char implemNot[] PROGMEM = "Not Implemented";
 const char implemBack[] PROGMEM = "To Menu: Press button";
+const char saveError[] PROGMEM = "Error saving score";
 
 const char* const string_table[] PROGMEM = {
   mainMenuTitle, 
@@ -90,25 +84,38 @@ const char* const string_table[] PROGMEM = {
   animSlit,
   implemNot,
   implemBack,
+  saveError,
 };
 
 char buffer[24];    // make sure this is large enough for the largest string it must hold
 
 
 
+// Main Menu
+short menuSelection = 0;
+uint8_t numberOfMenuSelections = 2;
+
+
 // Game One
-const uint8_t maxSpeed = 10;
 uint8_t stoneStartSpeed = 2;
 uint8_t stoneStartSize = 4;
 gameOneStone* gos = NULL;
-uint16_t highScoresOne[] = {5,6,7,8};
 
+
+// Game Two
+const uint8_t pipeStartSpeed = 1;
+const uint8_t pipeHoleStartSize = 20;
+gameTwoPipe* pipe = NULL;
 
 // Games
-uint16_t playerX, previousPlayerX, playerY, previousPlayerY;
+short playerX;
+short playerY;
+const uint8_t maxPlayerSpeed = 10;
+uint8_t previousPlayerX;
+uint8_t previousPlayerY; 
 uint16_t scoreTimer = 0;
 bool paused = false;
-uint8_t pauseMenuSelection = 0;
+short pauseMenuSelection = 0;
 uint8_t numberOfPauseMenuSelections = 2;
 const uint8_t tempLoadArraySize = 8;
 
@@ -132,9 +139,10 @@ void setup(void) {
   //Serial.print("Initializing SD card...");
   if (!SD.begin(chipSelect)) {
     Serial.println("initialization of SD card failed!");
-    //showText(25, 40, "SD init failed", ST7735_RED);
-    //showText(25, 50, "Please restart", ST7735_RED);
-
+    tft.fillScreen(backgroundColor);
+    showText(25, 40, "SD init failed", ST7735_RED);
+    showText(25, 50, "Please restart", ST7735_RED);
+    while(1);
     return;
   }
   Serial.println("initialization of CD card successfull.");
@@ -154,8 +162,8 @@ void setup(void) {
   }
   previousTime = now;
 
-  runStartUpAnimation(ST7735_BLACK, ST7735_GREEN);
-  tft.fillScreen(ST7735_BLACK);
+  runStartUpAnimation(backgroundColor, ST7735_GREEN);
+  tft.fillScreen(backgroundColor);
 
   showMainMenu();
   
@@ -187,14 +195,11 @@ void loop() {
     } else if (state == STATE_GAME_TWO) {
       tft.fillScreen(backgroundColor);
       startGameTwo();
-    } else if (state == STATE_HIGH_SCORES) {
+    } /*else if (state == STATE_HIGH_SCORES) {
       tft.fillScreen(backgroundColor);
-      showHighScoreMenu();
-    } else if (state == STATE_GAME_OVER) {
+      showHighScoreMenu(); 
+    } */else if (state == STATE_GAME_OVER) {
       showGameOverMenu();
-    } else {
-      tft.fillScreen(backgroundColor);
-      showNotImplemented();
     }
     previousState = state;
   }
@@ -208,9 +213,13 @@ void loop() {
     } else {
       playGameOne();
     }
-  }/* else if (state == STATE_GAME_TWO) {
-    // Game Two
-  }*/
+  } else if (state == STATE_GAME_TWO) {
+    if (paused){
+      pauseMenu();
+    } else {
+      playGameTwo();
+    }
+  }
   delay(50);
 }
 
@@ -224,6 +233,18 @@ void pressedJoystickButton() {
       paused = false;
       if (pauseMenuSelection == 1){
         SaveGameOneScore(scoreTimer);
+        state = STATE_MAIN_MENU;
+      }
+    } else{
+      paused = true;
+      showPauseMenu();
+    }
+  } else if (state == STATE_GAME_TWO) {
+    if (paused){
+      tft.fillScreen(backgroundColor);
+      paused = false;
+      if (pauseMenuSelection == 1){
+        SaveGameTwoScore(scoreTimer);
         state = STATE_MAIN_MENU;
       }
     } else{
@@ -258,30 +279,25 @@ void showMainMenu() {
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[0]))); //main menu
   showText(10, 20, buffer, ST7735_GREEN);
   tft.setTextSize(1);
-
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[1]))); //don't get hit
   showText(20, 65, buffer, ST7735_CYAN);
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[2]))); //through the slit
   showText(20, 85, buffer, ST7735_CYAN);
-  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[3]))); //high scores
-  showText(20, 105, buffer, ST7735_CYAN);
+  //strcpy_P(buffer, (char*)pgm_read_word(&(string_table[3]))); //high scores
+  //showText(20, 105, buffer, ST7735_CYAN);
 }
 
 void showMainMenuSelection() {
-  uint8_t y = 65 + (20 * menuSelection);
-
-  showText(5, y, ">", ST7735_WHITE);
+  showText(5, 65 + (20 * menuSelection), ">", ST7735_WHITE);
 }
 
 void hideMainMenuSelections() {
   for (uint8_t i = 0; i <= numberOfMenuSelections; i++) {
-    uint8_t y = 65 + (20 * i);
-    hideText(5, y, 6);
+    hideText(5, 65 + (20 * i), 6);
   }
 }
 
 // --- Pause Menu stuff --- //
-
 
 void pauseMenu(){
   updatePauseMenuSelection();
@@ -298,20 +314,17 @@ void updatePauseMenuSelection(){
 }
 
 void hidePauseMenuSelections(){
-  for (uint8_t i = 0; i <= numberOfPauseMenuSelections; i++) {
+  for (uint8_t i = 0; i <= numberOfPauseMenuSelections-1; i++) {
     uint8_t y = 70 + (20 * i);
     hideText(5, y, 6);
   }
 }
 
 void showPauseMenuSelection(){
-  uint8_t y = 70 + (20 * pauseMenuSelection);
-
-  showText(5, y, ">", ST7735_WHITE);
+  showText(5, 70 + (20 * pauseMenuSelection), ">", ST7735_WHITE);
 }
 
 void showPauseMenu() {
-  // Square of backgroundColor behind Paused Text
   tft.drawRoundRect(9, 17, 111, 27, 5, ST7735_RED);
   tft.setTextSize(3);
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[4]))); //paused
@@ -332,7 +345,6 @@ void hidePauseMenu(){
 
 void showGameOverMenu() {
   hideTextLine(0);
-  // Square of backgroundColor behind GameOver Text  
   tft.drawRoundRect(26, 11, 76, 54, 5, ST7735_RED);
   tft.setTextSize(3);
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[7]))); //game
@@ -362,7 +374,8 @@ void startGameOne() {
   if (gos) {
     gos->resetStone(random(tft.width() - gos->size ), stoneStartSpeed, stoneStartSize);
   } else {
-    gos = spawnStone(stoneStartSpeed, stoneStartSize);
+    gos = new gameOneStone(random(tft.width() - stoneStartSize), 
+      stoneStartSpeed, stoneStartSize, tft.height());
   }
 }
 
@@ -373,7 +386,7 @@ void playGameOne() {
   // Logic
   updateScoreTimer();
   updateGameOneStone();
-  if (CrashedWithPlayer(gos)) {
+  if (crashedWithPlayer(gos)) {
     state = STATE_GAME_OVER;
     //Save Score to file
     SaveGameOneScore(scoreTimer);
@@ -385,11 +398,7 @@ void playGameOne() {
   showUpdatePlayerPos();
 }
 
-gameOneStone* spawnStone(int speed, int size) {
-  return new gameOneStone(random(tft.width() - size), speed, size, tft.height());
-}
-
-bool CrashedWithPlayer(gameOneStone* _gos) {
+bool crashedWithPlayer(gameOneStone* _gos) {
   if (_gos->x + _gos->size - 1 < playerY) return false;
   if (_gos->x > playerY + 5) return false;
   if (_gos->y + _gos->size - 1 < playerX) return false;
@@ -409,49 +418,9 @@ void updateGameOneStone(){
 
 }
 
-void updateScoreTimer() {
-  if (previousTime.second() != now.second()) {
-    hideText(8 * 5, 0, 6 * 5);
-    previousTime = now;
-    scoreTimer++;
-  }
-}
-
-void updatePlayerInput() {  //Problem might be because int is unsigned
-  previousPlayerX = playerX;
-  previousPlayerY = playerY;
-
-  playerX += map(sensorValueX, 30, 1000, -maxSpeed, maxSpeed);
-  if (sensorValueX > 450 && sensorValueX < 550) playerX = previousPlayerX;
-  if (playerX < 10) playerX = 10; // 10 pixels reserved for score
-  else if (playerX >= tft.height() - 10) playerX = tft.height() - 10;
-
-  playerY += map(sensorValueY, 30, 1000, maxSpeed, -maxSpeed);
-  if (sensorValueY > 450 && sensorValueY < 550) playerY = previousPlayerY;
-  if (playerY <= 1) playerY = 50;
-  else if (playerY >= tft.width() - 6) playerY = tft.width() - 6;
-
-}
-
-void showUpdatePlayerPos(){
-  hideText(previousPlayerY, previousPlayerX, 6);
-  showText(playerY, playerX, "o", ST7735_WHITE);
-}
-
 void showUpdateStones() {
   tft.fillRect(gos->x, gos->previousY, gos->size, gos->size, backgroundColor);
   tft.fillRect(gos->x, gos->y, gos->size, gos->size, ST7735_RED);
-}
-
-void showScoreTimer() {
-  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[9]))); //score:
-  
-  //char s[] = {buffer, scoreTimer};
-  
-  sprintf(buffer, "%s%d", buffer, scoreTimer);
-
-  //s += scoreTimer;
-  showTextLine(0, buffer, ST7735_YELLOW);
 }
 
 
@@ -464,26 +433,105 @@ void startGameTwo(){
   scoreTimer = 0;
   paused = false;
 
-  // if wall, resetWall
-  // else, spawnWall
+  if (pipe) {
+    pipe->resetPipe(10 + random(tft.height() - 10 - pipeHoleStartSize), pipeHoleStartSize, pipeStartSpeed);
+  } else {
+    pipe = new gameTwoPipe(tft.height(), tft.width(), 
+    pipeStartSpeed, pipeHoleStartSize, 10 + random(tft.height() - 10 - pipeHoleStartSize));
+  }
+}
+
+void playGameTwo(){
+  // Input
+  updatePlayerInput();
+
+  // Logic
+  updateScoreTimer();
+  updateGameTwoPipe();
+  if (crashedWithPlayer(pipe)){
+    state = STATE_GAME_OVER;
+    SaveGameTwoScore(scoreTimer);
+  }
+
+  // Output
+  showUpdatePipes();
+  showScoreTimer();
+  showUpdatePlayerPos();
+}
+
+void updateGameTwoPipe(){
+  //TODO
+  pipe->moveStep();
+  if (pipe->previousX <= 0){
+    tft.fillRect(0, 10, pipe->pipeWidth, pipe->screenHeight - 10, backgroundColor);
+    pipe->backToStart(random(tft.height() - pipe->holeSize - 10));
+  }
+}
+
+bool crashedWithPlayer(gameTwoPipe* _pipe){
+  //TODO
+//  if (_gos->x + _gos->size - 1 < playerY) return false;
+//
+//  if (_gos->x > playerY + 5) return false;
+//  if (_gos->y + _gos->size - 1 < playerX) return false;
+//  if (_gos->y > playerX + 5) return false;
+
+  //return true;
+}
+
+void SaveGameTwoScore(uint16_t score){
+  //TODO
+}
+
+void showUpdatePipes(){
+  tft.fillRect(pipe->previousX, 10, pipe->pipeWidth, pipe->screenHeight - 10, backgroundColor);
+  tft.fillRect(pipe->x, 10, pipe->pipeWidth, pipe->holePosY, ST7735_GREEN);
+  uint8_t y = pipe->holePosY + pipe->holeSize + 10;
+  tft.fillRect(pipe->x, y, pipe->pipeWidth, pipe->screenHeight - y, ST7735_GREEN);
+}
 
 
-  //Remove later:
-  tft.fillScreen(backgroundColor);
-  showNotImplemented();
-  
+// --- Games --- //
+
+void updateScoreTimer() {
+  if (previousTime.second() != now.second()) {
+    hideText(8 * 5, 0, 6 * 5);
+    previousTime = now;
+    scoreTimer++;
+  }
+}
+
+void updatePlayerInput() {
+  previousPlayerX = playerX;
+  previousPlayerY = playerY;
+
+  playerX += map(sensorValueX, 30, 1000, -maxPlayerSpeed, maxPlayerSpeed);
+  if (sensorValueX > 450 && sensorValueX < 550) playerX = previousPlayerX;
+  if (playerX < 10) playerX = 10; // 10 pixels reserved for score
+  else if (playerX >= tft.height() - 10) playerX = tft.height() - 10;
+
+  playerY += map(sensorValueY, 30, 1000, maxPlayerSpeed, -maxPlayerSpeed);
+  if (sensorValueY > 450 && sensorValueY < 550) playerY = previousPlayerY;
+  if (playerY <= 0) playerY = 0;
+  else if (playerY >= tft.width() - 6) playerY = tft.width() - 6;
 
 }
+
+void showScoreTimer() {
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[9]))); //score:
+  sprintf(buffer, "%s%d", buffer, scoreTimer);
+  showTextLine(0, buffer, ST7735_YELLOW);
+}
+
+void showUpdatePlayerPos(){
+  //hideText(previousPlayerY, previousPlayerX, 6);
+  tft.fillRect(previousPlayerY, previousPlayerX+2, 5, 5, backgroundColor);
+  showText(playerY, playerX, "o", ST7735_WHITE);
+}
+
 
 
 // --- Show other stuff --- //
-
-void showNotImplemented() {
-  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[18])));  //not implemented
-  showText(15, 40, buffer, ST7735_RED);
-  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[19])));  //to menu
-  showText(0, 80, buffer, ST7735_BLUE);
-}
 
 void showTextLine(int yValue, char text[], uint16_t color) {
   showText(0, yValue, text, color);
@@ -495,6 +543,7 @@ void showText(int xValue, int yValue, char text[], uint16_t color) {
   tft.println(text);
 }
 
+/*
 void showHighScoreMenu(){
 
   //updateHighScores();
@@ -504,15 +553,10 @@ void showHighScoreMenu(){
 
 
   for (int i = 0; i <= sizeof(highScoresOne)/sizeof(highScoresOne[0])-1; i++){
-    //char s[] = {highScoresOne[i]};
-    //s += highScoresOne[i];
-
     sprintf(buffer, "%d", highScoresOne[i]);
-    
-
     showText(20, 20 + (10*i), buffer, ST7735_BLUE);
   }
-}
+}*/
 
 // --- Hide stuff --- //
 
@@ -522,7 +566,6 @@ void hideText(int xStart, int yStart, int width) {
 
 void hideTextLine(int yValue) {
   hideText(0, yValue, tft.width());
-  //tft.fillRect(0, yValue, tft.width(), 10 /*default font size*/, backgroundColor);
 }
 
 
@@ -645,14 +688,17 @@ void SaveGameOneScore(uint16_t score) {
   myFile = SD.open(buffer, FILE_WRITE);
   
   if (myFile) {
-    Serial.print("Writing Opened");
+    Serial.println("Writing Opened");
     
     myFile.println(score);
     myFile.close();
     
     Serial.println("closed");
   } else {
-    Serial.println("error writing");
+    //Serial.println("error writing");
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[20]))); //error saving
+    showText(10, 140, buffer, ST7735_RED);
+    delay(300);
   }
 }
 /*

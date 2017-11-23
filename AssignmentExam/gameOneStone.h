@@ -4,7 +4,6 @@
 class gameOneStone{
 public:
   gameOneStone(unsigned short _x, unsigned short _speed, unsigned short _size, unsigned short _maxFallLength);
-  ~gameOneStone();
   void moveStep();
   void backToTop(unsigned short _newPos);
   void resetStone(unsigned short _newPos, unsigned short _speed, unsigned short _size);
