@@ -108,7 +108,6 @@ const char* const string_table[] PROGMEM = {
 char buffer[24];    // make sure this is large enough for the largest string it must hold
 
 
-
 // Main Menu
 short menuSelection = 0;
 uint8_t numberOfMenuSelections = 2;
@@ -124,6 +123,7 @@ gameOneStone* gos = NULL;
 const uint8_t pipeStartSpeed = 1;
 const uint8_t pipeHoleStartSize = 40;
 gameTwoPipe* pipe = NULL;
+
 
 // Games
 short playerX;
@@ -147,17 +147,12 @@ void setup(void) {
 
   while (!Serial); // for Leonardo/Micro/Zero
 
-  //Serial.begin(57600);
   Serial.begin(9600);
   
-  
-  // Use this initializer if you're using a 1.8" TFT
   tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
   tft.setRotation(2); // Flips the output upside down. This is due to how I placed the hardware
   
-  //Serial.print("Initializing SD card...");
   if (!SD.begin(chipSelect)) {
-    //Serial.println("initialization of SD card failed!");
     tft.fillScreen(backgroundColor);
     strcpy_P(buffer, (char*)pgm_read_word(&(string_table[21]))); //sd init error
     showText(25, 40, buffer, ST7735_RED);
@@ -166,7 +161,6 @@ void setup(void) {
     while(1);
     return;
   }
-  //Serial.println("initialization of CD card successfull.");
     
 
   if (! rtc.begin()) {
@@ -217,10 +211,7 @@ void loop() {
     } else if (state == STATE_GAME_TWO) {
       tft.fillScreen(backgroundColor);
       startGameTwo();
-    } /*else if (state == STATE_HIGH_SCORES) {
-      tft.fillScreen(backgroundColor);
-      showHighScoreMenu(); 
-    } */else if (state == STATE_GAME_OVER) {
+    } else if (state == STATE_GAME_OVER) {
       showGameOverMenu();
     }
     previousState = state;
@@ -375,7 +366,7 @@ void showGameOverMenu() {
   
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[9]))); //score:
   sprintf(buffer, "%s%d", buffer, scoreTimer);
-  showText(35, 75, buffer, ST7735_GREEN);
+  showText(35, 75, buffer, ST7735_BLUE);
   
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[6]))); //back to menu
   showText(27, 110, buffer, ST7735_CYAN);
@@ -406,16 +397,17 @@ void playGameOne() {
   // Logic
   updateScoreTimer();
   updateGameOneStone();
-  if (crashedWithPlayer(gos)) {
-    state = STATE_GAME_OVER;
-    //Save Score to file
-    SaveGameOneScore(scoreTimer);
-  }
 
   // Output
   showUpdateStones();
   showScoreTimer();
   showUpdatePlayerPos();
+  
+  // Lose condition
+  if (crashedWithPlayer(gos)) {
+    state = STATE_GAME_OVER;
+    SaveGameOneScore(scoreTimer);
+  }
 }
 
 bool crashedWithPlayer(gameOneStone* _gos) {
@@ -468,15 +460,17 @@ void playGameTwo(){
   // Logic
   updateScoreTimer();
   updateGameTwoPipe();
-  if (crashedWithPlayer(pipe)){
-    state = STATE_GAME_OVER;
-    SaveGameTwoScore(scoreTimer);
-  }
 
   // Output
   showUpdatePipes();
   showScoreTimer();
   showUpdatePlayerPos();
+  
+  // Lose condition
+  if (crashedWithPlayer(pipe)){
+    state = STATE_GAME_OVER;
+    SaveGameTwoScore(scoreTimer);
+  }
 }
 
 void updateGameTwoPipe(){
