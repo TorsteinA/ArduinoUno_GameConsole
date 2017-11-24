@@ -44,14 +44,14 @@ const uint8_t STATE_GAME_OVER = 4;
 const char mainMenuTitle[] PROGMEM = "Main Menu";
 const char mainMenuGameOne[] PROGMEM = "Don't get hit";
 const char mainMenuGameTwo[] PROGMEM = "Through the slit";
-const char mainMenuScores[] PROGMEM = "High Scores";
+const char mainMenuScores[] PROGMEM = "High Scores";        // Not in use?
 const char pauseTitle[] PROGMEM = "Paused";
 const char pauseResume[] PROGMEM = "Resume";
 const char pauseBack[] PROGMEM = "Back to Menu";  //also for gameOver screen
 const char gameOverGame[] PROGMEM = "GAME";
 const char gameOverOver[] PROGMEM = "OVER";
 const char gameOverScore[] PROGMEM = "Score: ";
-const char highScore[] PROGMEM = "Scores:";
+const char highScore[] PROGMEM = "Scores:";                 // Not in use
 const char highFileOne[] PROGMEM = "game1.txt";
 const char animDont[] PROGMEM = "Don't";
 const char animGet[] PROGMEM = "Get";
@@ -59,32 +59,50 @@ const char animHit[] PROGMEM = "Hit";
 const char animThrough[] PROGMEM = "Through";
 const char animThe[] PROGMEM = "The";
 const char animSlit[] PROGMEM = "Slit";
-const char implemNot[] PROGMEM = "Not Implemented";
-const char implemBack[] PROGMEM = "To Menu: Press button";
-const char saveError[] PROGMEM = "Error saving score";
+const char implemNot[] PROGMEM = "Not Implemented";         // Not in use
+const char implemBack[] PROGMEM = "To Menu: Press button";  // Not in use ?
+const char saveError[] PROGMEM = "Error saving score";  
+const char sdError[] PROGMEM = "SD init failed";
+const char restartError[] PROGMEM = "Please restart";
+const char titleThe[] PROGMEM = "The";
+const char titleAdv[] PROGMEM = "Adventures";
+const char titleOf[] PROGMEM = "of";
+const char titleO[] PROGMEM = "O";
+const char rtcError[] PROGMEM = "RTC Error";
+const char saveSuccess[] PROGMEM = "Score saved";
+const char highFileTwo[] PROGMEM = "game2.txt";
 
 const char* const string_table[] PROGMEM = {
-  mainMenuTitle, 
+  mainMenuTitle,   // 0
   mainMenuGameOne, 
   mainMenuGameTwo, 
   mainMenuScores, 
   pauseTitle, 
-  pauseResume, 
+  pauseResume,     // 5
   pauseBack,
   gameOverGame,
   gameOverOver,
   gameOverScore,
-  highScore,
+  highScore,       // 10
   highFileOne,
   animDont,
   animGet,
   animHit,
-  animThrough,
+  animThrough,     // 15
   animThe,
   animSlit,
   implemNot,
   implemBack,
-  saveError,
+  saveError,       // 20
+  sdError,
+  restartError,
+  titleThe,
+  titleAdv,
+  titleOf,         // 25
+  titleO,
+  rtcError,
+  saveSuccess,
+  highFileTwo,
 };
 
 char buffer[24];    // make sure this is large enough for the largest string it must hold
@@ -104,7 +122,7 @@ gameOneStone* gos = NULL;
 
 // Game Two
 const uint8_t pipeStartSpeed = 1;
-const uint8_t pipeHoleStartSize = 20;
+const uint8_t pipeHoleStartSize = 40;
 gameTwoPipe* pipe = NULL;
 
 // Games
@@ -113,6 +131,7 @@ short playerY;
 const uint8_t maxPlayerSpeed = 10;
 uint8_t previousPlayerX;
 uint8_t previousPlayerY; 
+uint8_t scoreOffset = 10; 
 uint16_t scoreTimer = 0;
 bool paused = false;
 short pauseMenuSelection = 0;
@@ -138,27 +157,31 @@ void setup(void) {
   
   //Serial.print("Initializing SD card...");
   if (!SD.begin(chipSelect)) {
-    Serial.println("initialization of SD card failed!");
+    //Serial.println("initialization of SD card failed!");
     tft.fillScreen(backgroundColor);
-    showText(25, 40, "SD init failed", ST7735_RED);
-    showText(25, 50, "Please restart", ST7735_RED);
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[21]))); //sd init error
+    showText(25, 40, buffer, ST7735_RED);
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[22]))); //please restart
+    showText(25, 50, buffer, ST7735_RED);
     while(1);
     return;
   }
-  Serial.println("initialization of CD card successfull.");
+  //Serial.println("initialization of CD card successfull.");
     
 
   if (! rtc.begin()) {
-    Serial.println("Couldn't find RTC");
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[27]))); //rtc error
+    showText(25, 40, buffer, ST7735_RED);
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[22]))); //please restart
+    showText(25, 50, buffer, ST7735_RED);
     while (1);
   }
   if (! rtc.isrunning()) {
-    Serial.println("RTC is NOT running!");
-    // following line sets the RTC to the date & time this sketch was compiled
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[27]))); //rtc error
+    showText(25, 40, buffer, ST7735_RED);
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[22]))); //please restart
+    showText(25, 50, buffer, ST7735_RED);
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // January 21, 2014 at 3am you would call:
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
   previousTime = now;
 
@@ -166,7 +189,6 @@ void setup(void) {
   tft.fillScreen(backgroundColor);
 
   showMainMenu();
-  
 }
 
 void loop() {
@@ -283,8 +305,6 @@ void showMainMenu() {
   showText(20, 65, buffer, ST7735_CYAN);
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[2]))); //through the slit
   showText(20, 85, buffer, ST7735_CYAN);
-  //strcpy_P(buffer, (char*)pgm_read_word(&(string_table[3]))); //high scores
-  //showText(20, 105, buffer, ST7735_CYAN);
 }
 
 void showMainMenuSelection() {
@@ -460,34 +480,31 @@ void playGameTwo(){
 }
 
 void updateGameTwoPipe(){
-  //TODO
   pipe->moveStep();
-  if (pipe->previousX <= 0){
-    tft.fillRect(0, 10, pipe->pipeWidth, pipe->screenHeight - 10, backgroundColor);
-    pipe->backToStart(random(tft.height() - pipe->holeSize - 10));
+  if (pipe->x <= 0){
+    pipe->x = 0;
+  }
+  if(pipe->previousX <= 0){
+    tft.fillRect(0, scoreOffset, pipe->pipeWidth*2, pipe->screenHeight - scoreOffset, backgroundColor);
+    pipe->backToStart(random(tft.height() - pipe->holeSize - scoreOffset));
   }
 }
 
 bool crashedWithPlayer(gameTwoPipe* _pipe){
-  //TODO
-//  if (_gos->x + _gos->size - 1 < playerY) return false;
-//
-//  if (_gos->x > playerY + 5) return false;
-//  if (_gos->y + _gos->size - 1 < playerX) return false;
-//  if (_gos->y > playerX + 5) return false;
-
-  //return true;
-}
-
-void SaveGameTwoScore(uint16_t score){
-  //TODO
+  if (playerY > pipe->x + pipe->pipeWidth) return false;
+  if (playerY + 5 < pipe->x) return false;
+  if (playerX + 2 > pipe->holePosY + scoreOffset){
+    if(playerX + 2 + 5 < pipe->holePosY + pipe->holeSize + scoreOffset) return false;
+  }
+  return true;
 }
 
 void showUpdatePipes(){
-  tft.fillRect(pipe->previousX, 10, pipe->pipeWidth, pipe->screenHeight - 10, backgroundColor);
-  tft.fillRect(pipe->x, 10, pipe->pipeWidth, pipe->holePosY, ST7735_GREEN);
-  uint8_t y = pipe->holePosY + pipe->holeSize + 10;
-  tft.fillRect(pipe->x, y, pipe->pipeWidth, pipe->screenHeight - y, ST7735_GREEN);
+  uint8_t diff = pipe->previousX - pipe->x;
+  tft.fillRect(pipe->x + pipe->pipeWidth, scoreOffset, diff, pipe->screenHeight - scoreOffset, backgroundColor);
+  tft.fillRect(pipe->x, scoreOffset, diff, pipe->holePosY, ST7735_GREEN);
+  uint8_t y = pipe->holePosY + pipe->holeSize + scoreOffset;
+  tft.fillRect(pipe->x, y, diff, pipe->screenHeight - y, ST7735_GREEN);
 }
 
 
@@ -506,7 +523,7 @@ void updatePlayerInput() {
   previousPlayerY = playerY;
 
   playerX += map(sensorValueX, 30, 1000, -maxPlayerSpeed, maxPlayerSpeed);
-  if (sensorValueX > 450 && sensorValueX < 550) playerX = previousPlayerX;
+  if (sensorValueX > 470 && sensorValueX < 530) playerX = previousPlayerX;
   if (playerX < 10) playerX = 10; // 10 pixels reserved for score
   else if (playerX >= tft.height() - 10) playerX = tft.height() - 10;
 
@@ -514,7 +531,6 @@ void updatePlayerInput() {
   if (sensorValueY > 450 && sensorValueY < 550) playerY = previousPlayerY;
   if (playerY <= 0) playerY = 0;
   else if (playerY >= tft.width() - 6) playerY = tft.width() - 6;
-
 }
 
 void showScoreTimer() {
@@ -524,11 +540,9 @@ void showScoreTimer() {
 }
 
 void showUpdatePlayerPos(){
-  //hideText(previousPlayerY, previousPlayerX, 6);
   tft.fillRect(previousPlayerY, previousPlayerX+2, 5, 5, backgroundColor);
   showText(playerY, playerX, "o", ST7735_WHITE);
 }
-
 
 
 // --- Show other stuff --- //
@@ -543,20 +557,6 @@ void showText(int xValue, int yValue, char text[], uint16_t color) {
   tft.println(text);
 }
 
-/*
-void showHighScoreMenu(){
-
-  //updateHighScores();
-
-  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[10])));
-  showText(10, 10, buffer, ST7735_CYAN);
-
-
-  for (int i = 0; i <= sizeof(highScoresOne)/sizeof(highScoresOne[0])-1; i++){
-    sprintf(buffer, "%d", highScoresOne[i]);
-    showText(20, 20 + (10*i), buffer, ST7735_BLUE);
-  }
-}*/
 
 // --- Hide stuff --- //
 
@@ -575,8 +575,7 @@ void runStartUpAnimation(uint16_t color1, uint16_t color2) {
   tft.fillScreen(backgroundColor);
 
   uint8_t color = 100;
-  uint8_t i;
-  uint8_t t;
+  uint8_t i, t;
   for(t = 0 ; t <= 4; t+=1) {
     uint8_t x = 0;
     uint8_t y = 0;
@@ -594,13 +593,17 @@ void runStartUpAnimation(uint16_t color1, uint16_t color2) {
   }
   delay(100);
   tft.setTextSize(4);
-  showText(30, 17, "The", ST7735_GREEN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[23])));  //the
+  showText(30, 17, buffer, ST7735_GREEN);
   tft.setTextSize(2);
-  showText(5, 58, "Adventures", ST7735_GREEN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[24])));  //adventures
+  showText(5, 58, buffer, ST7735_GREEN);
   tft.setTextSize(3);
-  showText(48, 80, "of", ST7735_GREEN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[25])));  //of
+  showText(48, 80, buffer, ST7735_GREEN);
   tft.setTextSize(5);
-  showText(50, 110, "O", ST7735_GREEN);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[26])));  //o
+  showText(50, 110, buffer, ST7735_GREEN);
   tft.setTextSize(1);
   delay(2000);
 }
@@ -652,87 +655,34 @@ void showGameTwoStartupAnimation(){
 
 // --- SD Card methods --- //
 
-/*
-void updateHighScores(){
-  //Load all values from SD card ("game1.txt") into tempArray
-  //Sort tempArray in decreasing order
-  //Fill highScoresOne array with elements from tempArray
-  //Clear file ("game1.txt")
-  //Save top scores in order
-
-
-  
-  
-  int* score;//[tempLoadArraySize];
-
-  Serial.print("Score created.");
-  Serial.println(score[0]);
-  
-  LoadGameOneScore(&score);
-
-  Serial.print("Score returned. Now: ");
-  Serial.println(score[0]);
-  
-  
-  // Sort temp Array
-
-  
-  for(byte i = 0; i <= sizeof(highScoresOne)/sizeof(highScoresOne[0]); i++){
-    highScoresOne[i] = score[i];
-  }
-}
-*/
 void SaveGameOneScore(uint16_t score) { 
-  
-  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[11])));  //fileName
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[11])));  //fileName 1
   myFile = SD.open(buffer, FILE_WRITE);
   
   if (myFile) {
-    Serial.println("Writing Opened");
-    
     myFile.println(score);
     myFile.close();
-    
-    Serial.println("closed");
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[28]))); //score saved
+    showText(30, 140, buffer, ST7735_GREEN);
   } else {
-    //Serial.println("error writing");
     strcpy_P(buffer, (char*)pgm_read_word(&(string_table[20]))); //error saving
     showText(10, 140, buffer, ST7735_RED);
-    delay(300);
   }
+  delay(300);
 }
-/*
-void LoadGameOneScore(int **score){
-//  int score[tempLoadArraySize];
-  int i = 0;
-  Serial.println("Reading from game1.txt");
 
-  //myFile = SD.open("game1.txt");
-  myFile = SD.open("game1.txt");
+void SaveGameTwoScore(uint16_t score){
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[29])));  //fileName 2
+  myFile = SD.open(buffer, FILE_WRITE);
   
   if (myFile) {
-    Serial.println("opened game1.txt");
-
-    // read from the file until there's nothing else in it:
-    //while (myFile.available() && i <= sizeof(highScoresOne)/sizeof(highScoresOne[0] -1) ) {
-    //while (i <= 4) {
-    //while (i <= sizeof(highScoresOne)/sizeof(highScoresOne[0]) && myFile.available())
-    while (i <= tempLoadArraySize && myFile.available())
-    {
-      Serial.print("Reading value from game1..");
-      int k = myFile.read();
-      Serial.println(k);
-      //Serial.write(myFile.read());
-      *score[i] = k;//myFile.read();   // Set back to k
-      //highScoresOne[i] = k;
-      i++;
-    }
-
+    myFile.println(score);
     myFile.close();
-    Serial.println("closed game1.txt");
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[28]))); //score saved
+    showText(30, 140, buffer, ST7735_GREEN);
   } else {
-    Serial.println("error opening game1.txt for reading");
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[20]))); //error saving
+    showText(10, 140, buffer, ST7735_RED);
   }
-  //return score;
+  delay(300);
 }
-*/

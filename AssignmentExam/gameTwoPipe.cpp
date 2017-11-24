@@ -21,6 +21,7 @@ void gameTwoPipe::moveStep(){
 
 void gameTwoPipe::backToStart(unsigned short _newHolePosY){
     x = screenWidth;
+    previousX = x;
     if (++pipeSpeed >= maxSpeed) pipeSpeed = maxSpeed;
     if (pipeSpeed == maxSpeed) {
         if (--holeSize < minHoleSize) holeSize = minHoleSize;
