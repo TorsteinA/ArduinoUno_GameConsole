@@ -6,6 +6,8 @@
 #include "RTClib.h"
 #include "gameOneStone.h"
 #include "gameTwoPipe.h"
+#include "pitches.h"
+
 
 // For the breakout, you can use any 2 or 3 pins
 // These pins will also work for the 1.8" TFT shield
@@ -18,6 +20,7 @@ const uint8_t analogInPinY = A0;
 const uint8_t analogInPinX = A1;
 const uint8_t buttonPin = 2;
 const uint8_t chipSelect = 4;
+const uint8_t tonePin = 7;
 
 uint16_t sensorValueY = 0;
 uint16_t sensorValueX = 0;
@@ -38,8 +41,7 @@ uint8_t previousState;
 const uint8_t STATE_MAIN_MENU = 0;
 const uint8_t STATE_GAME_ONE = 1;
 const uint8_t STATE_GAME_TWO = 2;
-const uint8_t STATE_HIGH_SCORES = 3;
-const uint8_t STATE_GAME_OVER = 4;
+const uint8_t STATE_GAME_OVER = 3;
 
 const char titleThe[] PROGMEM = "The";
 const char titleAdv[] PROGMEM = "Adventures";
@@ -130,14 +132,30 @@ short pauseMenuSelection = 0;
 uint8_t numberOfPauseMenuSelections = 2;
 const uint8_t tempLoadArraySize = 8;
 
+
+// Audio
+
+uint8_t melodyIterator;
+
+uint8_t noteDurationStartup = 8;
+uint8_t melodyStartup[] = {
+  0, NOTE_F3, NOTE_F3, 0, 0, 0, 0, 0
+};
+
+uint8_t noteDurationsGameOver[] = {
+  8, 8, 8, 4, 4, 4, 2
+};
+uint8_t melodyGameOver[] = {
+  NOTE_C3, NOTE_D3, NOTE_E3, NOTE_F3, NOTE_E3, NOTE_D3, NOTE_C3
+};
+
+
 void setup(void) {
 
   pinMode(buttonPin, INPUT);
   pinMode(analogInPinY, INPUT);
   pinMode(analogInPinX, INPUT);
   randomSeed(analogRead(0));
-
-  //while (!Serial); // for Leonardo/Micro/Zero
 
   Serial.begin(9600);
   
@@ -194,6 +212,7 @@ void loop() {
 
   // Check State Update
   if (state != previousState) {
+    melodyIterator = 0;
     if (state == STATE_MAIN_MENU) {
       tft.fillScreen(backgroundColor);
       showMainMenu();
@@ -205,11 +224,12 @@ void loop() {
       startGameTwo();
     } else if (state == STATE_GAME_OVER) {
       showGameOverMenu();
+      playGameOverAudio();
     }
     previousState = state;
   }
 
-  // Display
+  // Display / Actions
   if (state == STATE_MAIN_MENU) {
     mainMenu();
   } else if (state == STATE_GAME_ONE) {
@@ -225,8 +245,54 @@ void loop() {
       playGameTwo();
     }
   }
-  delay(50);
+
+  // Audio
+  if (state == STATE_MAIN_MENU) {
+    playMainMenuAudio();
+  } else {
+    delay(50);
+  }
+
+  //delay(50);
 }
+
+
+void playMainMenuAudio(){
+  uint8_t lengthMel = (sizeof(melodyStartup) / sizeof(melodyStartup[0]));
+  uint16_t noteDuration = 1000 / noteDurationStartup;
+  tone(tonePin, melodyStartup[melodyIterator % lengthMel], 
+    noteDuration);
+  uint16_t pauseBetweenNotes = noteDuration * 1.30;
+  delay(pauseBetweenNotes);
+  noTone(tonePin);
+
+  if (++melodyIterator >= lengthMel){
+    melodyIterator = 0;
+  }
+}
+
+void playGameOverAudio(){
+  for (int i = 0; i <= (sizeof(melodyGameOver) / sizeof(melodyGameOver[0])) - 1; i++) {
+    int noteDuration = 1000 / noteDurationsGameOver[i % (sizeof(noteDurationsGameOver) / sizeof(noteDurationsGameOver[0]))];
+    tone(tonePin, melodyGameOver[i % (sizeof(melodyGameOver) / sizeof(melodyGameOver[0]))], noteDuration);
+    int pauseBetweenNotes = noteDuration * 1.30;
+    delay(pauseBetweenNotes);
+    noTone(tonePin);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 void pressedJoystickButton() {
@@ -260,6 +326,7 @@ void pressedJoystickButton() {
     state = STATE_MAIN_MENU;
   }
 }
+
 
 // --- Main Menu Stuff --- //
 
@@ -399,6 +466,7 @@ void playGameOne() {
   if (crashedWithPlayer(gos)) {
     state = STATE_GAME_OVER;
     SaveGameOneScore();
+    //playGameOverAudio();
   }
 }
 
@@ -462,6 +530,7 @@ void playGameTwo(){
   if (crashedWithPlayer(pipe)){
     state = STATE_GAME_OVER;
     SaveGameTwoScore();
+    //playGameOverAudio();
   }
 }
 
@@ -585,7 +654,7 @@ void runStartUpAnimation(uint16_t color1, uint16_t color2) {
     }
     color+=100;
   }
-  delay(100);
+  
   tft.setTextSize(4);
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[0])));  //the
   showText(30, 17, buffer, ST7735_GREEN);
@@ -663,7 +732,7 @@ void SaveGameOneScore(){
     strcpy_P(buffer, (char*)pgm_read_word(&(string_table[22]))); //error saving
     showText(10, 140, buffer, ST7735_RED);
   }
-  delay(300);
+  delay(200);
 }
 
 void SaveGameTwoScore(){
@@ -679,5 +748,5 @@ void SaveGameTwoScore(){
     strcpy_P(buffer, (char*)pgm_read_word(&(string_table[22]))); //error saving
     showText(10, 140, buffer, ST7735_RED);
   }
-  delay(300);
+  delay(200);
 }
