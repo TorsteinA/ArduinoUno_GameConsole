@@ -134,18 +134,16 @@ const uint8_t tempLoadArraySize = 8;
 
 
 // Audio
-
 uint8_t melodyIterator;
-
-uint8_t noteDurationStartup = 8;
-uint8_t melodyStartup[] = {
-  0, NOTE_F3, NOTE_F3, 0, 0, 0, 0, 0
+const uint8_t noteDurationStartup = 6;
+const uint8_t melodyStartup[] = {
+  0, NOTE_A3, NOTE_D3, NOTE_F3, 0, NOTE_A3, NOTE_D3, NOTE_F3,
+  0, NOTE_F3, NOTE_D3, NOTE_C3, 0, NOTE_F3, NOTE_D3, NOTE_C3
 };
-
-uint8_t noteDurationsGameOver[] = {
+const uint8_t noteDurationsGameOver[] = {
   8, 8, 8, 4, 4, 4, 2
 };
-uint8_t melodyGameOver[] = {
+const uint8_t melodyGameOver[] = {
   NOTE_C3, NOTE_D3, NOTE_E3, NOTE_F3, NOTE_E3, NOTE_D3, NOTE_C3
 };
 
@@ -256,45 +254,6 @@ void loop() {
   //delay(50);
 }
 
-
-void playMainMenuAudio(){
-  uint8_t lengthMel = (sizeof(melodyStartup) / sizeof(melodyStartup[0]));
-  uint16_t noteDuration = 1000 / noteDurationStartup;
-  tone(tonePin, melodyStartup[melodyIterator % lengthMel], 
-    noteDuration);
-  uint16_t pauseBetweenNotes = noteDuration * 1.30;
-  delay(pauseBetweenNotes);
-  noTone(tonePin);
-
-  if (++melodyIterator >= lengthMel){
-    melodyIterator = 0;
-  }
-}
-
-void playGameOverAudio(){
-  for (int i = 0; i <= (sizeof(melodyGameOver) / sizeof(melodyGameOver[0])) - 1; i++) {
-    int noteDuration = 1000 / noteDurationsGameOver[i % (sizeof(noteDurationsGameOver) / sizeof(noteDurationsGameOver[0]))];
-    tone(tonePin, melodyGameOver[i % (sizeof(melodyGameOver) / sizeof(melodyGameOver[0]))], noteDuration);
-    int pauseBetweenNotes = noteDuration * 1.30;
-    delay(pauseBetweenNotes);
-    noTone(tonePin);
-  }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 void pressedJoystickButton() {
   if (state == STATE_MAIN_MENU) { 
     state = menuSelection + 1; // +1 to offset from mainMenu state
@@ -328,7 +287,7 @@ void pressedJoystickButton() {
 }
 
 
-// --- Main Menu Stuff --- //
+// --- Main Menu Methods --- //
 
 void mainMenu() {
   updateMenuSelection();
@@ -367,7 +326,7 @@ void hideMainMenuSelections() {
   }
 }
 
-// --- Pause Menu stuff --- //
+// --- Pause Menu Methods --- //
 
 void pauseMenu(){
   updatePauseMenuSelection();
@@ -411,7 +370,7 @@ void hidePauseMenu(){
 }
 
 
-// --- Game Over Menu stuff --- //
+// --- Game Over Menu Methods --- //
 
 void showGameOverMenu() {
   hideTextLine(0);
@@ -433,7 +392,7 @@ void showGameOverMenu() {
 }
 
 
-// --- Game One Stuff --- //
+// --- Game One Methods --- //
 
 void startGameOne() {
   showGameOneStartupAnimation();
@@ -496,7 +455,7 @@ void showUpdateStones() {
 }
 
 
-// --- Game Two stuff --- //
+// --- Game Two Methods --- //
 
 void startGameTwo(){
   showGameTwoStartupAnimation();
@@ -563,7 +522,7 @@ void showUpdatePipes(){
 }
 
 
-// --- Games --- //
+// --- Both Games Methods --- //
 
 void updateScoreTimer(bool gameOne) {
   if (previousTime.second() != now.second()) {
@@ -608,7 +567,7 @@ void showUpdatePlayerPos(){
 }
 
 
-// --- Show Text --- //
+// --- Show Text Methods --- //
 
 void showTextLine(int yValue, char text[], uint16_t color) {
   showText(0, yValue, text, color);
@@ -621,7 +580,7 @@ void showText(int xValue, int yValue, char text[], uint16_t color) {
 }
 
 
-// --- Hide Text --- //
+// --- Hide Text Methods --- //
 
 void hideText(int xStart, int yStart, int width) {
   tft.fillRect(xStart, yStart, width, 10 /*default font size*/, backgroundColor);
@@ -632,7 +591,7 @@ void hideTextLine(int yValue) {
 }
 
 
-// --- Animations --- //
+// --- Animation Methods --- //
 
 void runStartUpAnimation(uint16_t color1, uint16_t color2) {
   tft.fillScreen(backgroundColor);
@@ -717,7 +676,7 @@ void showGameTwoStartupAnimation(){
 }
 
 
-// --- SD Card methods --- //
+// --- SD Card Methods --- //
 
 void SaveGameOneScore(){
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[13])));  //fileName 1
@@ -749,4 +708,31 @@ void SaveGameTwoScore(){
     showText(10, 140, buffer, ST7735_RED);
   }
   delay(200);
+}
+
+
+// --- Audio Methods --- //
+
+void playMainMenuAudio(){
+  uint8_t lengthMel = (sizeof(melodyStartup) / sizeof(melodyStartup[0]));
+  uint16_t noteDuration = 1000 / noteDurationStartup;
+  tone(tonePin, melodyStartup[melodyIterator % lengthMel], 
+    noteDuration);
+  uint16_t pauseBetweenNotes = noteDuration * 1.30;
+  delay(pauseBetweenNotes);
+  noTone(tonePin);
+
+  if (++melodyIterator >= lengthMel){
+    melodyIterator = 0;
+  }
+}
+
+void playGameOverAudio(){
+  for (uint8_t i = 0; i <= (sizeof(melodyGameOver) / sizeof(melodyGameOver[0])) - 1; i++) {
+    uint16_t noteDuration = 1000 / noteDurationsGameOver[i % (sizeof(noteDurationsGameOver) / sizeof(noteDurationsGameOver[0]))];
+    tone(tonePin, melodyGameOver[i % (sizeof(melodyGameOver) / sizeof(melodyGameOver[0]))], noteDuration);
+    uint16_t pauseBetweenNotes = noteDuration * 1.30;
+    delay(pauseBetweenNotes);
+    noTone(tonePin);
+  }
 }
