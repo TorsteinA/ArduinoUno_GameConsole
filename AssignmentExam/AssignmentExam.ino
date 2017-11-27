@@ -262,7 +262,7 @@ void pressedJoystickButton() {
       tft.fillScreen(backgroundColor);
       paused = false;
       if (pauseMenuSelection == 1){
-        SaveGameOneScore();
+        saveGameOneScore();
         state = STATE_MAIN_MENU;
       }
     } else{
@@ -274,7 +274,7 @@ void pressedJoystickButton() {
       tft.fillScreen(backgroundColor);
       paused = false;
       if (pauseMenuSelection == 1){
-        SaveGameTwoScore();
+        saveGameTwoScore();
         state = STATE_MAIN_MENU;
       }
     } else{
@@ -424,7 +424,7 @@ void playGameOne() {
   // Lose condition
   if (crashedWithPlayer(gos)) {
     state = STATE_GAME_OVER;
-    SaveGameOneScore();
+    saveGameOneScore();
     //playGameOverAudio();
   }
 }
@@ -488,7 +488,7 @@ void playGameTwo(){
   // Lose condition
   if (crashedWithPlayer(pipe)){
     state = STATE_GAME_OVER;
-    SaveGameTwoScore();
+    saveGameTwoScore();
     //playGameOverAudio();
   }
 }
@@ -678,7 +678,7 @@ void showGameTwoStartupAnimation(){
 
 // --- SD Card Methods --- //
 
-void SaveGameOneScore(){
+void saveGameOneScore(){
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[13])));  //fileName 1
   myFile = SD.open(buffer, FILE_WRITE);
   
@@ -694,7 +694,7 @@ void SaveGameOneScore(){
   delay(200);
 }
 
-void SaveGameTwoScore(){
+void saveGameTwoScore(){
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[14])));  //fileName 2
   myFile = SD.open(buffer, FILE_WRITE);
   
